@@ -13,12 +13,35 @@
         active-text-color="#ffffff"
         @select="handleSelect"
       >
-        <el-menu-item v-for="menu in topMenus" :key="menu.key" :index="menu.key">
-          <el-icon v-if="menu.icon">
-            <component :is="menu.icon" />
-          </el-icon>
-          <template #title>{{ menu.title }}</template>
-        </el-menu-item>
+        <el-sub-menu index="dashboard">
+          <template #title>
+            <el-icon><HomeFilled /></el-icon>
+            <span>工作台</span>
+          </template>
+          <el-menu-item index="dashboard">首页</el-menu-item>
+          <el-menu-item index="notice">公告</el-menu-item>
+          <el-menu-item index="todo">待办事项</el-menu-item>
+        </el-sub-menu>
+        
+        <el-sub-menu index="tools">
+          <template #title>
+            <el-icon><Tools /></el-icon>
+            <span>快捷工具</span>
+          </template>
+          <el-menu-item index="calculator">薪资计算器</el-menu-item>
+          <el-menu-item index="schedule">排班工具</el-menu-item>
+          <el-menu-item index="export">导出报表</el-menu-item>
+        </el-sub-menu>
+        
+        <el-sub-menu index="help">
+          <template #title>
+            <el-icon><QuestionFilled /></el-icon>
+            <span>帮助中心</span>
+          </template>
+          <el-menu-item index="guide">使用指南</el-menu-item>
+          <el-menu-item index="faq">常见问题</el-menu-item>
+          <el-menu-item index="contact">联系我们</el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </div>
     <div class="user-info">
@@ -31,6 +54,9 @@
           <el-dropdown-menu>
             <el-dropdown-item @click="handleUserCenter">
               <el-icon><User /></el-icon>个人中心
+            </el-dropdown-item>
+            <el-dropdown-item @click="handleTheme">
+              <el-icon><Brush /></el-icon>主题设置
             </el-dropdown-item>
             <el-dropdown-item @click="handleLogout">
               <el-icon><SwitchButton /></el-icon>退出登录
@@ -47,16 +73,6 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import defaultAvatar from '@/assets/avatar.png'
 
-// 顶部菜单
-const topMenus = ref([
-  { key: 'system', title: '系统管理', icon: 'Setting' },
-  { key: 'employee', title: '员工管理', icon: 'User' },
-  { key: 'role', title: '角色管理', icon: 'Lock' },
-  { key: 'menu', title: '菜单管理', icon: 'Menu' },
-  { key: 'salary', title: '薪资管理', icon: 'Money' },
-  { key: 'attendance', title: '考勤管理', icon: 'Calendar' },
-])
-
 // 用户信息
 const username = ref('管理员')
 const userAvatar = ref(defaultAvatar)
@@ -67,18 +83,54 @@ const route = useRoute()
 
 // 当前激活菜单
 const activeMenu = computed(() => {
-  return route.meta.activeMenu as string || route.path
+  return route.meta.activeMenu as string || 'dashboard'
 })
 
 // 处理菜单选择
 const handleSelect = (key: string) => {
-  console.log(key)
-  // 这里可以添加路由跳转逻辑
+  console.log('选择菜单:', key)
+  // 根据key处理不同的路由跳转或功能
+  switch (key) {
+    case 'dashboard':
+      router.push('/dashboard')
+      break
+    case 'notice':
+      router.push('/notice')
+      break
+    case 'todo':
+      router.push('/todo')
+      break
+    case 'calculator':
+      // 可以打开一个计算器弹窗等
+      break
+    case 'schedule':
+      router.push('/tools/schedule')
+      break
+    case 'export':
+      // 处理导出功能
+      break
+    case 'guide':
+      router.push('/help/guide')
+      break
+    case 'faq':
+      router.push('/help/faq')
+      break
+    case 'contact':
+      router.push('/help/contact')
+      break
+    default:
+      break
+  }
 }
 
 // 处理用户中心点击
 const handleUserCenter = () => {
   router.push('/user/profile')
+}
+
+// 处理主题设置
+const handleTheme = () => {
+  // 打开主题设置面板
 }
 
 // 处理退出登录
@@ -95,7 +147,12 @@ const handleLogout = () => {
   background-color: #1989fa;
   color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1001;
+  
   .logo {
     padding: 0 16px;
     display: flex;
@@ -122,6 +179,16 @@ const handleLogout = () => {
       &:hover {
         background-color: #0c70d2 !important;
       }
+    }
+    
+    :deep(.el-sub-menu__title) {
+      &:hover {
+        background-color: #0c70d2 !important;
+      }
+    }
+    
+    :deep(.el-sub-menu.is-active .el-sub-menu__title) {
+      border-bottom: 2px solid #fff;
     }
   }
 

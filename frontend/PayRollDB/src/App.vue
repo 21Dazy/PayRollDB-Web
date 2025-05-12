@@ -20,23 +20,13 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #333;
-  overflow-x: hidden;
-  position: relative;
+  overflow: hidden;
 }
 
-body {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  min-height: 100vh;
-  /* 移动端100vh问题的修复 */
-  min-height: -webkit-fill-available;
-}
-
-/* 修复Safari中的100vh问题 */
-@supports (-webkit-touch-callout: none) {
-  body {
-    min-height: -webkit-fill-available;
-  }
+#app {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
 /* 滚动条样式 */

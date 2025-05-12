@@ -1,5 +1,5 @@
 <template>
-  <div class="app-sidebar">
+  <div class="app-sidebar" :class="{ 'collapsed': isCollapse }">
     <el-menu
       :default-active="activeMenu"
       :collapse="isCollapse"
@@ -32,14 +32,14 @@
     </el-menu>
     
     <div class="collapse-btn" @click="toggleCollapse">
-      <el-icon v-if="isCollapse"><Expand /></el-icon>
-      <el-icon v-else><Fold /></el-icon>
+      <el-icon :size="20" v-if="isCollapse"><Expand /></el-icon>
+      <el-icon :size="20" v-else><Fold /></el-icon>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 // 侧边栏菜单
@@ -119,6 +119,15 @@ const activeMenu = computed(() => {
 // 是否折叠
 const isCollapse = ref(false)
 
+// 定义emit
+const emit = defineEmits(['update:collapsed'])
+
+// 切换折叠状态并触发事件
+const toggleCollapse = () => {
+  isCollapse.value = !isCollapse.value
+  emit('update:collapsed', isCollapse.value)
+}
+
 // 处理菜单选择
 const handleSelect = (key: string) => {
   if (key === 'dashboard') {
@@ -135,11 +144,6 @@ const handleSelect = (key: string) => {
   
   router.push(routePath)
 }
-
-// 切换折叠状态
-const toggleCollapse = () => {
-  isCollapse.value = !isCollapse.value
-}
 </script>
 
 <style scoped lang="scss">
@@ -148,22 +152,39 @@ const toggleCollapse = () => {
   position: relative;
   background-color: #001529;
   transition: width 0.3s;
+  width: 220px;
+  
+  &.collapsed {
+    width: 64px;
+    
+    .collapse-btn {
+      width: 64px;
+    }
+  }
   
   .sidebar-menu {
-    height: 100%;
+    height: calc(100% - 40px); /* 减去底部折叠按钮的高度 */
     border-right: none;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   
   .collapse-btn {
     position: absolute;
-    bottom: 20px;
+    bottom: 0;
     left: 0;
-    right: 0;
+    width: 100%;
     text-align: center;
     color: #fff;
     background-color: #0c2135;
-    padding: 8px 0;
     cursor: pointer;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    border-top: 1px solid #132436;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.15);
     
     &:hover {
       background-color: #163a5a;
@@ -172,6 +193,10 @@ const toggleCollapse = () => {
   
   :deep(.el-menu) {
     border-right: none;
+  }
+  
+  :deep(.el-menu--collapse) {
+    width: 64px;
   }
   
   :deep(.el-sub-menu__title) {
