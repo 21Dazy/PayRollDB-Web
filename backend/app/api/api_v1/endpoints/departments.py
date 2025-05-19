@@ -148,7 +148,7 @@ def delete_department(
     db: Session = Depends(get_db),
     department_id: int,
     current_user: User = Depends(get_current_hr_user)
-) -> Any:
+) -> None:
     """
     删除部门（需要HR或管理员权限）
     
@@ -178,6 +178,4 @@ def delete_department(
     )
     
     db.delete(department)
-    db.commit()
-    
-    return None 
+    db.commit() 

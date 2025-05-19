@@ -22,7 +22,7 @@ class Employee(Base):
     # 关系
     department = relationship("Department", back_populates="employees")
     position = relationship("Position", back_populates="employees")
-    user = relationship("User", back_populates="employee", uselist=False)
+    user = relationship("User", back_populates="employee", uselist=False, primaryjoin="Employee.id == User.employee_id")
     attendances = relationship("Attendance", back_populates="employee")
     salary_records = relationship("SalaryRecord", back_populates="employee")
     social_security = relationship("EmployeeSocialSecurity", back_populates="employee") 

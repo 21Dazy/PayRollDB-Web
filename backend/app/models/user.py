@@ -7,7 +7,7 @@ class User(Base):
     """用户模型"""
     username = Column(String(50), unique=True, nullable=False, index=True, comment='用户名')
     password = Column(String(255), nullable=False, comment='密码(加密存储)')
-    employee_id = Column(Integer, ForeignKey('employee.id'), comment='关联员工ID')
+    employee_id = Column(Integer, ForeignKey('employee.id', ondelete="SET NULL"), nullable=True, comment='关联员工ID')
     role = Column(
         Enum('admin', 'hr', 'manager', 'employee', name='user_role'), 
         nullable=False, 
@@ -17,5 +17,5 @@ class User(Base):
     last_login = Column(DateTime, comment='上次登录时间')
     
     # 关系
-    employee = relationship("Employee", back_populates="user")
-    operation_logs = relationship("OperationLog", back_populates="user") 
+    employee = relationship("Employee", foreign_keys=[employee_id], back_populates="user")
+    operation_logs = relationship("OperationLog", back_populates="user", cascade="all, delete-orphan") 
