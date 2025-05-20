@@ -18,4 +18,4 @@ class Attendance(Base):
     
     # 关系
     employee = relationship("Employee", back_populates="attendances")
-    status = relationship("AttendanceStatus", backref="attendances") 
+    status = relationship("AttendanceStatus", back_populates="attendances") 

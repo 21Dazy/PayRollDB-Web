@@ -50,13 +50,74 @@ pip install -r requirements.txt
 4. 复制`.env.example`为`.env`并配置环境变量
 5. 创建数据库并初始化
 
-## 启动服务
+## 数据库初始化
 
-开发模式启动：
+项目使用MySQL数据库，在启动前需要初始化数据库。
+
+### 1. 创建数据库
+
+首先确保MySQL服务已启动，然后创建数据库：
+
+```sql
+CREATE DATABASE salary_management_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 2. 初始化表结构和基础数据
+
+运行创建表和初始化基础数据的脚本：
+
+```bash
+python create_tables.py
+```
+
+这将创建所有必要的表结构，并初始化基础数据，包括：
+- 考勤状态
+- 工资项目
+- 默认社保配置
+- 系统参数
+
+### 3. 创建管理员用户
+
+运行创建管理员用户的脚本：
+
+```bash
+python init_admin.py
+```
+
+这将创建：
+- 管理部门
+- 系统管理员职位
+- 管理员员工
+- 管理员用户
+
+默认的管理员用户名和密码为：
+- 用户名：`admin`
+- 密码：`admin123`
+
+## 启动应用
+
+初始化完成后，启动应用：
 
 ```bash
 uvicorn main:app --reload
 ```
+
+或者直接运行：
+
+```bash
+python main.py
+```
+
+然后访问：http://localhost:8000/docs 查看API文档并进行测试。
+
+## API测试
+
+1. 打开Swagger UI：http://localhost:8000/docs
+2. 使用`/api/v1/auth/login`接口登录获取令牌
+   - 用户名：`admin`
+   - 密码：`admin123`
+3. 点击Authorize按钮，输入获取的令牌
+4. 现在可以测试所有需要认证的API了
 
 ## API文档
 

@@ -150,10 +150,9 @@ def delete_department(
     current_user: User = Depends(get_current_hr_user)
 ) -> None:
     """
-    删除部门（需要HR或管理员权限）
-    
-    注意：如果部门下有员工，将无法删除
+    删除部门
     """
+    # 检查部门是否存在
     department = db.query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(
@@ -161,12 +160,12 @@ def delete_department(
             detail="部门不存在"
         )
     
-    # 检查部门是否有员工
+    # 检查部门下是否有员工
     employee_count = db.query(Employee).filter(Employee.department_id == department_id).count()
     if employee_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"部门下有{employee_count}名员工，无法删除"
+            detail="部门下有员工，无法删除"
         )
     
     # 记录操作日志
@@ -174,8 +173,11 @@ def delete_department(
         db=db,
         user_id=current_user.id,
         operation_type="删除部门",
-        operation_content=f"删除了部门: {department.name}"
+        operation_detail=f"删除了部门: {department.name}, ID: {department.id}"
     )
     
+    # 删除部门
     db.delete(department)
-    db.commit() 
+    db.commit()
+    
+    return None 

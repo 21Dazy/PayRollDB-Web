@@ -1,5 +1,8 @@
-# 导入所有模型以确保SQLAlchemy正确创建表关系
+# Import all the models, so that Base has them before being imported by Alembic
+
 from app.db.base_class import Base
+
+# 导入顺序很重要，先导入基本模型，后导入有关联的模型
 from app.models.department import Department
 from app.models.position import Position
 from app.models.employee import Employee

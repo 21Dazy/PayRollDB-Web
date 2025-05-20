@@ -114,10 +114,9 @@ def delete_position(
     current_user: User = Depends(get_current_hr_user)
 ) -> None:
     """
-    删除职位（需要HR或管理员权限）
-    
-    注意：如果职位下有员工，将无法删除
+    删除职位
     """
+    # 检查职位是否存在
     position = db.query(Position).filter(Position.id == position_id).first()
     if not position:
         raise HTTPException(
@@ -125,12 +124,12 @@ def delete_position(
             detail="职位不存在"
         )
     
-    # 检查职位是否有员工
+    # 检查职位下是否有员工
     employee_count = db.query(Employee).filter(Employee.position_id == position_id).count()
     if employee_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"职位下有{employee_count}名员工，无法删除"
+            detail="职位下有员工，无法删除"
         )
     
     # 记录操作日志
@@ -138,8 +137,11 @@ def delete_position(
         db=db,
         user_id=current_user.id,
         operation_type="删除职位",
-        operation_content=f"删除了职位: {position.name}"
+        operation_detail=f"删除了职位: {position.name}, ID: {position.id}"
     )
     
+    # 删除职位
     db.delete(position)
-    db.commit() 
+    db.commit()
+    
+    return None 

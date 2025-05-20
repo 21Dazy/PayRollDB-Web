@@ -2,17 +2,27 @@ from typing import Generator, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
+from jose import jwt
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.core.config import settings
+from app.core.security import ALGORITHM
+from app.db.session import SessionLocal
 from app.models.user import User
 from app.schemas.token import TokenPayload
 
 # OAuth2 配置
-reusable_oauth2 = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+reusable_oauth2 = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login"
+)
+
+def get_db() -> Generator:
+    try:
+        db = SessionLocal()
+        yield db
+    finally:
+        db.close()
 
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
@@ -22,13 +32,13 @@ def get_current_user(
     """
     try:
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            token, settings.SECRET_KEY, algorithms=[ALGORITHM]
         )
         token_data = TokenPayload(**payload)
-    except (JWTError, ValidationError):
+    except (jwt.JWTError, ValidationError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无法验证凭证",
+            detail="无效的凭证",
             headers={"WWW-Authenticate": "Bearer"},
         )
     user = db.query(User).filter(User.id == token_data.sub).first()
@@ -48,7 +58,20 @@ def get_current_active_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用户未激活")
     return current_user
 
-def get_current_admin_user(
+def get_current_hr_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    获取当前HR用户或管理员
+    """
+    if current_user.role not in ["hr", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="权限不足，需要HR或管理员权限"
+        )
+    return current_user
+
+def get_current_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """
@@ -58,19 +81,6 @@ def get_current_admin_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="权限不足，需要管理员权限"
-        )
-    return current_user
-
-def get_current_hr_user(
-    current_user: User = Depends(get_current_user),
-) -> User:
-    """
-    获取当前HR用户或管理员
-    """
-    if current_user.role not in ["admin", "hr"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="权限不足，需要HR或管理员权限"
         )
     return current_user
 

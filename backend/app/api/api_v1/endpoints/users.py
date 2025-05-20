@@ -3,7 +3,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin_user, get_current_user, get_db
+from app.api.deps import get_current_admin, get_current_user, get_db
 from app.core.security import get_password_hash, verify_password
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserPasswordUpdate
@@ -18,7 +18,7 @@ def read_users(
     role: str = None,
     is_active: bool = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_admin)
 ) -> Any:
     """
     获取用户列表
@@ -37,7 +37,7 @@ def create_user(
     *,
     db: Session = Depends(get_db),
     user_in: UserCreate,
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_admin)
 ) -> Any:
     """
     创建新用户
@@ -67,7 +67,7 @@ def create_user(
         db=db,
         user_id=current_user.id,
         operation_type="创建用户",
-        operation_content=f"创建了用户: {user.username}"
+        operation_detail=f"创建了用户: {user.username}"
     )
     
     return user
@@ -77,7 +77,7 @@ def read_user(
     *,
     db: Session = Depends(get_db),
     user_id: int,
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_admin)
 ) -> Any:
     """
     获取用户详情
@@ -96,7 +96,7 @@ def update_user(
     db: Session = Depends(get_db),
     user_id: int,
     user_in: UserUpdate,
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_admin)
 ) -> Any:
     """
     更新用户信息
@@ -133,7 +133,7 @@ def update_user(
         db=db,
         user_id=current_user.id,
         operation_type="更新用户",
-        operation_content=f"更新了用户: {user.username}"
+        operation_detail=f"更新了用户: {user.username}"
     )
     
     return user
@@ -143,7 +143,7 @@ def delete_user(
     *,
     db: Session = Depends(get_db),
     user_id: int,
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_admin)
 ) -> None:
     """
     删除用户
@@ -160,11 +160,13 @@ def delete_user(
         db=db,
         user_id=current_user.id,
         operation_type="删除用户",
-        operation_content=f"删除了用户: {user.username}"
+        operation_detail=f"删除了用户: {user.username}"
     )
     
     db.delete(user)
     db.commit()
+    
+    return None
 
 @router.post("/{user_id}/change-password", status_code=status.HTTP_200_OK)
 def change_user_password(
@@ -208,7 +210,7 @@ def change_user_password(
         db=db,
         user_id=current_user.id,
         operation_type="修改密码",
-        operation_content=f"修改了用户密码: {user.username}"
+        operation_detail=f"修改了用户密码: {user.username}"
     )
     
     return {"message": "密码修改成功"}

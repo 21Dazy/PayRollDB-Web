@@ -8,6 +8,9 @@ from app.core.config import settings
 # 密码上下文配置
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# 从config中导入算法常量
+ALGORITHM = settings.ALGORITHM
+
 def create_access_token(
     subject: Union[str, Any], expires_delta: timedelta = None
 ) -> str:
@@ -21,7 +24,7 @@ def create_access_token(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     to_encode = {"exp": expire, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -40,7 +43,7 @@ def encrypt_bank_account(account_number: str) -> bytes:
     """
     加密银行账号
     """
-    # 实现加密逻辑
+    # 实现加密逻辑 
     # 这里使用简单实现，实际开发中应使用更安全的方法
     from cryptography.fernet import Fernet
     import base64
