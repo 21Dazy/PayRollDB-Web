@@ -5,6 +5,8 @@ from app.db.base_class import Base
 
 class SocialSecurityConfig(Base):
     """社保公积金配置模型"""
+    __tablename__ = "social_security_config"
+    
     name = Column(String(50), nullable=False, comment='配置名称')
     pension_rate = Column(DECIMAL(5, 2), nullable=False, comment='养老保险比例')
     medical_rate = Column(DECIMAL(5, 2), nullable=False, comment='医疗保险比例')

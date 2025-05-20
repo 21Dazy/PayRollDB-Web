@@ -5,9 +5,11 @@ from app.db.base_class import Base
 
 class Employee(Base):
     """员工模型"""
+    __tablename__ = "employees"
+    
     name = Column(String(50), nullable=False, comment='姓名')
-    department_id = Column(Integer, ForeignKey('department.id'), nullable=False, index=True, comment='部门ID')
-    position_id = Column(Integer, ForeignKey('position.id'), nullable=False, index=True, comment='职位ID')
+    department_id = Column(Integer, ForeignKey('departments.id'), nullable=False, index=True, comment='部门ID')
+    position_id = Column(Integer, ForeignKey('positions.id'), nullable=False, index=True, comment='职位ID')
     base_salary = Column(DECIMAL(10, 2), nullable=False, comment='基本工资')
     hire_date = Column(Date, nullable=False, comment='入职日期')
     phone = Column(String(20), comment='联系电话')

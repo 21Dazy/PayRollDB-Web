@@ -5,7 +5,9 @@ from app.db.base_class import Base
 
 class EmployeeSocialSecurity(Base):
     """员工社保公积金配置模型"""
-    employee_id = Column(Integer, ForeignKey('employee.id'), nullable=False, index=True, comment='员工ID')
+    __tablename__ = "employee_social_security"
+    
+    employee_id = Column(Integer, ForeignKey('employees.id'), nullable=False, index=True, comment='员工ID')
     config_id = Column(Integer, ForeignKey('social_security_config.id'), nullable=False, comment='社保配置ID')
     base_number = Column(DECIMAL(10, 2), nullable=False, comment='社保基数')
     housing_fund_base = Column(DECIMAL(10, 2), nullable=False, comment='公积金基数')

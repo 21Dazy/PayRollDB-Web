@@ -21,8 +21,8 @@ class Position(Base):
 class Employee(Base):
     """员工模型"""
     name = Column(String(50), nullable=False, comment='姓名')
-    department_id = Column(Integer, ForeignKey('department.id'), nullable=False, index=True, comment='部门ID')
-    position_id = Column(Integer, ForeignKey('position.id'), nullable=False, index=True, comment='职位ID')
+    department_id = Column(Integer, ForeignKey('departments.id'), nullable=False, index=True, comment='部门ID')
+    position_id = Column(Integer, ForeignKey('positions.id'), nullable=False, index=True, comment='职位ID')
     base_salary = Column(DECIMAL(10, 2), nullable=False, comment='基本工资')
     hire_date = Column(Date, nullable=False, comment='入职日期')
     phone = Column(String(20), comment='联系电话')
@@ -38,22 +38,23 @@ class Employee(Base):
 class User(Base):
     """用户模型"""
     username = Column(String(50), unique=True, nullable=False, index=True, comment='用户名')
-    hashed_password = Column(String(255), nullable=False, comment='密码(加密存储)')
-    employee_id = Column(Integer, ForeignKey('employee.id', ondelete="SET NULL"), nullable=True, comment='关联员工ID')
+    password = Column(String(255), nullable=False, comment='密码(加密存储)')
+    employee_id = Column(Integer, ForeignKey('employees.id', ondelete="SET NULL"), nullable=True, comment='关联员工ID')
     role = Column(
         Enum('admin', 'hr', 'manager', 'employee', name='user_role'), 
-        nullable=False, 
+        nullable=False,
+        index=True,
         comment='角色'
     )
-    is_active = Column(Boolean, default=True, comment='是否激活(1:是, 0:否)')
+    is_active = Column(Boolean, default=True, index=True, comment='是否激活(1:是, 0:否)')
     last_login = Column(DateTime, comment='上次登录时间')
 
 # 操作日志模型
 class OperationLog(Base):
     """操作日志模型"""
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False, index=True, comment='用户ID')
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True, comment='用户ID')
     operation_type = Column(String(50), nullable=False, comment='操作类型')
-    operation_detail = Column(String(255), nullable=False, comment='操作详情')
+    operation_content = Column(Text, comment='操作内容')
     ip_address = Column(String(50), comment='IP地址')
-    user_agent = Column(String(255), comment='用户代理')
+    operation_time = Column(DateTime, nullable=False, comment='操作时间')
     created_at = Column(TIMESTAMP, server_default=func.now(), comment='创建时间') 

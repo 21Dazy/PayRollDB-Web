@@ -5,7 +5,7 @@
 """
 from sqlalchemy import text
 
-from app.db.base import Base
+from app.db.base import Base, NoUpdateBase
 from app.db.session import engine
 from app.models.attendance_status import AttendanceStatus
 from app.models.salary_item import SalaryItem
@@ -15,6 +15,7 @@ from app.models.system_parameter import SystemParameter
 def create_tables():
     print("开始创建数据库表...")
     Base.metadata.create_all(bind=engine)
+    NoUpdateBase.metadata.create_all(bind=engine)
     print("数据库表创建完成")
 
 def init_basic_data():

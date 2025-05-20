@@ -8,71 +8,91 @@ import sys
 import traceback
 from datetime import date
 from pathlib import Path
+from sqlalchemy import text
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent
 sys.path.append(str(project_root))
 
-from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-
 from app.db.session import engine, SessionLocal
-from app.models.user import User
-from app.models.department import Department
-from app.models.position import Position
-from app.models.employee import Employee
-
-# 密码上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.core.security import get_password_hash
 
 def init_admin():
     """初始化管理员账号"""
     db = SessionLocal()
     try:
         # 检查是否已有用户
-        user = db.query(User).first()
-        if user:
+        user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        if user_count > 0:
             print("管理员用户已存在，无需初始化")
             return
         
         # 创建管理员所在部门
-        department = Department(name="管理部门", description="系统管理部门")
-        db.add(department)
-        db.flush()
-        print(f"部门创建成功: {department.name}")
+        db.execute(
+            text("INSERT INTO departments (name, description) VALUES (:name, :description)"),
+            {"name": "管理部门", "description": "系统管理部门"}
+        )
+        result = db.execute(text("SELECT LAST_INSERT_ID()"))
+        department_id = result.scalar()
+        print(f"部门创建成功，ID: {department_id}")
         
         # 创建管理员职位
-        position = Position(name="系统管理员", description="系统管理员职位", department_id=department.id)
-        db.add(position)
-        db.flush()
+        db.execute(
+            text("INSERT INTO positions (name, description) VALUES (:name, :description)"),
+            {"name": "系统管理员", "description": "系统管理员职位"}
+        )
+        result = db.execute(text("SELECT LAST_INSERT_ID()"))
+        position_id = result.scalar()
+        print(f"职位创建成功，ID: {position_id}")
         
         # 创建管理员员工信息
-        employee = Employee(
-            name="管理员",
-            gender="男",
-            id_card="000000000000000000",
-            date_of_birth=date(1990, 1, 1),
-            phone="13800000000",
-            email="admin@example.com",
-            address="系统默认地址",
-            hire_date=date(2020, 1, 1),
-            department_id=department.id,
-            position_id=position.id
+        db.execute(
+            text("""
+                INSERT INTO employees (
+                    name, department_id, position_id, base_salary, hire_date, 
+                    phone, email, address, id_card, status
+                ) VALUES (
+                    :name, :department_id, :position_id, :base_salary, :hire_date,
+                    :phone, :email, :address, :id_card, :status
+                )
+            """),
+            {
+                "name": "管理员",
+                "department_id": department_id,
+                "position_id": position_id,
+                "base_salary": 8000.00,
+                "hire_date": date(2020, 1, 1),
+                "phone": "13800000000",
+                "email": "admin@example.com",
+                "address": "系统默认地址",
+                "id_card": "000000000000000000",
+                "status": True
+            }
         )
-        db.add(employee)
-        db.flush()
+        result = db.execute(text("SELECT LAST_INSERT_ID()"))
+        employee_id = result.scalar()
+        print(f"员工创建成功，ID: {employee_id}")
         
         # 创建管理员账号
-        admin_user = User(
-            username="admin",
-            hashed_password=pwd_context.hash("admin123"),
-            is_active=True,
-            is_superuser=True,
-            employee_id=employee.id
+        hashed_password = get_password_hash("admin123")
+        db.execute(
+            text("""
+                INSERT INTO users (
+                    username, password, employee_id, role, is_active
+                ) VALUES (
+                    :username, :password, :employee_id, :role, :is_active
+                )
+            """),
+            {
+                "username": "admin",
+                "password": hashed_password,
+                "employee_id": employee_id,
+                "role": "admin",
+                "is_active": True
+            }
         )
-        db.add(admin_user)
-        db.commit()
         
+        db.commit()
         print("管理员用户初始化成功，用户名：admin，密码：admin123")
     except Exception as e:
         db.rollback()

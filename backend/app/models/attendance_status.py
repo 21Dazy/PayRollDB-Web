@@ -5,6 +5,8 @@ from app.db.base_class import Base
 
 class AttendanceStatus(Base):
     """考勤状态模型"""
+    __tablename__ = "attendance_status"
+    
     name = Column(String(20), nullable=False, comment='状态名称')
     description = Column(String(100), comment='状态描述')
     is_deduction = Column(Boolean, default=False, comment='是否扣款(1:是, 0:否)')

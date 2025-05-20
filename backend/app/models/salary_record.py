@@ -5,7 +5,9 @@ from app.db.base_class import Base
 
 class SalaryRecord(Base):
     """工资记录模型"""
-    employee_id = Column(Integer, ForeignKey('employee.id'), nullable=False, index=True, comment='员工ID')
+    __tablename__ = "salary_records"
+    
+    employee_id = Column(Integer, ForeignKey('employees.id'), nullable=False, index=True, comment='员工ID')
     year = Column(Integer, nullable=False, comment='年份')
     month = Column(Integer, nullable=False, comment='月份')
     base_salary = Column(DECIMAL(10, 2), nullable=False, comment='基本工资')
@@ -15,7 +17,7 @@ class SalaryRecord(Base):
     social_security = Column(DECIMAL(10, 2), default=0, comment='社保公积金')
     personal_tax = Column(DECIMAL(10, 2), default=0, comment='个人所得税')
     net_salary = Column(DECIMAL(10, 2), nullable=False, comment='实发工资')
-    status = Column(Enum('pending', 'paid', name='salary_status'), default='pending', comment='发放状态')
+    status = Column(Enum('pending', 'paid', name='salary_status'), default='pending', index=True, comment='发放状态')
     payment_date = Column(DateTime, comment='发放日期')
     remark = Column(String(255), comment='备注')
     

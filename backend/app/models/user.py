@@ -5,19 +5,19 @@ from app.db.base_class import Base
 
 class User(Base):
     """用户模型"""
+    __tablename__ = "users"
+    
     username = Column(String(50), unique=True, nullable=False, index=True, comment='用户名')
-    hashed_password = Column(String(255), nullable=False, comment='密码(加密存储)')
-    employee_id = Column(Integer, ForeignKey('employee.id', ondelete="SET NULL"), nullable=True, comment='关联员工ID')
+    password = Column(String(255), nullable=False, comment='密码(加密存储)')
+    employee_id = Column(Integer, ForeignKey('employees.id', ondelete="SET NULL"), nullable=True, comment='关联员工ID')
     role = Column(
         Enum('admin', 'hr', 'manager', 'employee', name='user_role'), 
         nullable=False, 
+        index=True,
         comment='角色'
     )
-    is_active = Column(Boolean, default=True, comment='是否激活(1:是, 0:否)')
+    is_active = Column(Boolean, default=True, index=True, comment='是否激活(1:是, 0:否)')
     last_login = Column(DateTime, comment='上次登录时间')
     
     # 关系
-    employee = relationship("Employee", foreign_keys=[employee_id], back_populates="user")
-
-    # 使用字符串表示类名延迟加载避免循环引用
-    operation_logs = relationship("OperationLog", back_populates="user", cascade="all, delete-orphan") 
+    employee = relationship("Employee", foreign_keys=[employee_id], back_populates="user") 

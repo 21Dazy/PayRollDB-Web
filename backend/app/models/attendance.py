@@ -5,7 +5,9 @@ from app.db.base_class import Base
 
 class Attendance(Base):
     """考勤记录模型"""
-    employee_id = Column(Integer, ForeignKey('employee.id'), nullable=False, index=True, comment='员工ID')
+    __tablename__ = "attendance"
+    
+    employee_id = Column(Integer, ForeignKey('employees.id'), nullable=False, index=True, comment='员工ID')
     date = Column(Date, nullable=False, comment='日期')
     status_id = Column(Integer, ForeignKey('attendance_status.id'), nullable=False, comment='出勤状态ID')
     overtime_hours = Column(DECIMAL(5, 2), default=0, comment='加班时长(小时)')

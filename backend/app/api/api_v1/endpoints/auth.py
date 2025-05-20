@@ -1,9 +1,10 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.api.deps import get_current_user
 from app.core.config import settings
@@ -44,7 +45,7 @@ def login_access_token(
     log_operation(db, user.id, "登录", "用户登录系统")
     
     # 更新最后登录时间
-    user.last_login = db.func.now()
+    user.last_login = datetime.now()
     db.commit()
     
     return {
