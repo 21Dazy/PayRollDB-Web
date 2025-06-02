@@ -7,9 +7,12 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
-// 导入Mock数据，仅在开发环境使用
-if (import.meta.env.MODE === 'development') {
+// 导入Mock数据，仅在开发环境且VITE_MOCK_ENABLED为true时使用
+if (import.meta.env.MODE === 'development' && import.meta.env.VITE_MOCK_ENABLED === 'true') {
+  console.log('Mock数据已启用')
   import('./utils/mock')
+} else {
+  console.log('使用真实API')
 }
 
 import App from './App.vue'

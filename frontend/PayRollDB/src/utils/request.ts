@@ -1,6 +1,6 @@
 import axios from 'axios'
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
-import { ElMessage, ElLoading } from 'element-plus'
+import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
+import { ElMessage } from 'element-plus'
 import router from '@/router'
 
 // 创建axios实例
@@ -12,15 +12,12 @@ const service: AxiosInstance = axios.create({
 
 // 请求拦截器
 service.interceptors.request.use(
-  (config: AxiosRequestConfig) => {
+  (config: InternalAxiosRequestConfig) => {
     // 在发送请求之前做些什么
     const token = localStorage.getItem('token')
-    if (token) {
+    if (token && config.headers) {
       // 让每个请求携带token
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${token}`,
-      }
+      config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
@@ -119,22 +116,22 @@ service.interceptors.response.use(
 )
 
 // 封装GET请求
-export const get = <T = any>(url: string, params?: any, config?: AxiosRequestConfig): Promise<T> => {
+export const get = <T = any>(url: string, params?: any, config?: InternalAxiosRequestConfig): Promise<T> => {
   return service.get(url, { params, ...config })
 }
 
 // 封装POST请求
-export const post = <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
+export const post = <T = any>(url: string, data?: any, config?: InternalAxiosRequestConfig): Promise<T> => {
   return service.post(url, data, config)
 }
 
 // 封装PUT请求
-export const put = <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
+export const put = <T = any>(url: string, data?: any, config?: InternalAxiosRequestConfig): Promise<T> => {
   return service.put(url, data, config)
 }
 
 // 封装DELETE请求
-export const del = <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
+export const del = <T = any>(url: string, config?: InternalAxiosRequestConfig): Promise<T> => {
   return service.delete(url, config)
 }
 
