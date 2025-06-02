@@ -11,14 +11,11 @@
     
     <div class="search-bar">
       <el-form :inline="true" :model="searchForm" class="search-form">
-        <el-form-item label="工号">
-          <el-input v-model="searchForm.employeeId" placeholder="请输入工号" clearable />
-        </el-form-item>
-        <el-form-item label="姓名">
-          <el-input v-model="searchForm.name" placeholder="请输入姓名" clearable />
+        <el-form-item label="关键词">
+          <el-input v-model="searchForm.keyword" placeholder="工号/姓名/电话" clearable />
         </el-form-item>
         <el-form-item label="部门">
-          <el-select v-model="searchForm.departmentId" placeholder="请选择部门" clearable>
+          <el-select v-model="searchForm.department_id" placeholder="请选择部门" clearable>
             <el-option
               v-for="item in departmentOptions"
               :key="item.value"
@@ -28,13 +25,19 @@
           </el-select>
         </el-form-item>
         <el-form-item label="职位">
-          <el-select v-model="searchForm.positionId" placeholder="请选择职位" clearable>
+          <el-select v-model="searchForm.position_id" placeholder="请选择职位" clearable>
             <el-option
               v-for="item in positionOptions"
               :key="item.value"
               :label="item.label"
               :value="item.value"
             />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+            <el-option value="active" label="在职" />
+            <el-option value="inactive" label="离职" />
           </el-select>
         </el-form-item>
         <el-form-item label="入职日期">
@@ -106,94 +109,103 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Upload, Download } from '@element-plus/icons-vue'
+import { useEmployeesStore } from '@/stores/employees'
+import { useDepartmentsStore } from '@/stores/departments'
+import { usePositionsStore } from '@/stores/positions'
 
 const router = useRouter()
 
+// 引入stores
+const employeesStore = useEmployeesStore()
+const departmentsStore = useDepartmentsStore()
+const positionsStore = usePositionsStore()
+
 // 搜索表单
 const searchForm = reactive({
-  employeeId: '',
-  name: '',
-  departmentId: '',
-  positionId: '',
+  keyword: '',
+  department_id: '',
+  position_id: '',
+  status: '',
   hireDateRange: []
 })
 
 // 部门选项
-const departmentOptions = ref([
-  { value: '1', label: '研发部' },
-  { value: '2', label: '市场部' },
-  { value: '3', label: '销售部' },
-  { value: '4', label: '财务部' },
-  { value: '5', label: '人事部' }
-])
+const departmentOptions = computed(() => {
+  return departmentsStore.departments.map(dept => ({
+    value: dept.id,
+    label: dept.name
+  }))
+})
 
 // 职位选项
-const positionOptions = ref([
-  { value: '1', label: '总监' },
-  { value: '2', label: '经理' },
-  { value: '3', label: '主管' },
-  { value: '4', label: '工程师' },
-  { value: '5', label: '专员' }
-])
+const positionOptions = computed(() => {
+  return positionsStore.positions.map(pos => ({
+    value: pos.id,
+    label: pos.name
+  }))
+})
 
 // 表格数据
-const tableData = ref([
-  {
-    id: 1,
-    employeeId: 'EMP001',
-    name: '张三',
-    departmentName: '研发部',
-    positionName: '工程师',
-    baseSalary: 15000,
-    hireDate: '2020-01-01',
-    phone: '13800138000',
-    status: 1
-  },
-  {
-    id: 2,
-    employeeId: 'EMP002',
-    name: '李四',
-    departmentName: '市场部',
-    positionName: '经理',
-    baseSalary: 18000,
-    hireDate: '2019-05-10',
-    phone: '13800138001',
-    status: 1
-  },
-  {
-    id: 3,
-    employeeId: 'EMP003',
-    name: '王五',
-    departmentName: '销售部',
-    positionName: '专员',
-    baseSalary: 12000,
-    hireDate: '2021-03-15',
-    phone: '13800138002',
-    status: 0
-  }
-])
+const tableData = computed(() => {
+  return employeesStore.employees.map(emp => ({
+    id: emp.id,
+    employeeId: emp.id.toString().padStart(4, '0'),
+    name: emp.name,
+    departmentName: emp.department?.name || '-',
+    positionName: emp.position?.name || '-',
+    baseSalary: emp.basic_salary,
+    hireDate: emp.entry_date,
+    phone: emp.phone,
+    status: emp.status === 'active' ? 1 : 0
+  }))
+})
 
 // 分页
 const currentPage = ref(1)
 const pageSize = ref(10)
-const total = ref(100)
+const total = computed(() => employeesStore.totalCount)
 
 // 加载状态
-const loading = ref(false)
+const loading = computed(() => employeesStore.isLoading)
 
 // 获取员工列表数据
 const fetchData = () => {
-  loading.value = true
+  const params: any = {
+    skip: (currentPage.value - 1) * pageSize.value,
+    limit: pageSize.value
+  }
   
-  // 这里使用了模拟数据，实际项目中会调用API
-  setTimeout(() => {
-    loading.value = false
-    // 假设这里是API返回的结果
-  }, 500)
+  // 添加搜索条件
+  if (searchForm.keyword) {
+    params.keyword = searchForm.keyword
+  }
+  
+  if (searchForm.department_id) {
+    params.department_id = searchForm.department_id
+  }
+  
+  if (searchForm.position_id) {
+    params.position_id = searchForm.position_id
+  }
+  
+  if (searchForm.status) {
+    params.status = searchForm.status
+  }
+  
+  // 入职日期范围
+  if (searchForm.hireDateRange && searchForm.hireDateRange.length === 2) {
+    const [start, end] = searchForm.hireDateRange
+    if (start && end) {
+      params.entry_date_start = start.toISOString().split('T')[0]
+      params.entry_date_end = end.toISOString().split('T')[0]
+    }
+  }
+  
+  employeesStore.getEmployees(params)
 }
 
 // 处理查询
@@ -204,9 +216,10 @@ const handleSearch = () => {
 
 // 处理重置
 const handleReset = () => {
-  Object.keys(searchForm).forEach(key => {
-    searchForm[key] = ''
-  })
+  searchForm.keyword = ''
+  searchForm.department_id = ''
+  searchForm.position_id = ''
+  searchForm.status = ''
   searchForm.hireDateRange = []
   handleSearch()
 }
@@ -235,17 +248,82 @@ const handleAdd = () => {
 
 // 导入员工
 const handleImport = () => {
-  ElMessage.info('导入功能待实现')
+  // 创建文件输入元素
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls,.csv'
+  
+  // 文件选择事件
+  input.onchange = async (event) => {
+    const target = event.target as HTMLInputElement
+    if (target.files && target.files.length > 0) {
+      const file = target.files[0]
+      
+      try {
+        await employeesStore.importEmployees(file)
+        ElMessage.success('员工数据导入成功')
+        fetchData() // 重新加载数据
+      } catch (error: any) {
+        ElMessage.error(`导入失败: ${error.message || '未知错误'}`)
+      }
+    }
+  }
+  
+  // 触发文件选择
+  input.click()
 }
 
 // 导出员工
-const handleExport = () => {
-  ElMessage.info('导出功能待实现')
+const handleExport = async () => {
+  try {
+    const params: any = {}
+    
+    // 添加搜索条件
+    if (searchForm.keyword) {
+      params.keyword = searchForm.keyword
+    }
+    
+    if (searchForm.department_id) {
+      params.department_id = searchForm.department_id
+    }
+    
+    if (searchForm.position_id) {
+      params.position_id = searchForm.position_id
+    }
+    
+    if (searchForm.status) {
+      params.status = searchForm.status
+    }
+    
+    // 入职日期范围
+    if (searchForm.hireDateRange && searchForm.hireDateRange.length === 2) {
+      const [start, end] = searchForm.hireDateRange
+      if (start && end) {
+        params.entry_date_start = start.toISOString().split('T')[0]
+        params.entry_date_end = end.toISOString().split('T')[0]
+      }
+    }
+    
+    const blob = await employeesStore.exportEmployees(params)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `员工数据_${new Date().toISOString().split('T')[0]}.xlsx`
+    link.click()
+    
+    // 清理
+    window.URL.revokeObjectURL(url)
+    
+  } catch (error: any) {
+    ElMessage.error(`导出失败: ${error.message || '未知错误'}`)
+  }
 }
 
 // 查看员工
 const handleView = (row) => {
-  ElMessage.info(`查看员工：${row.name}`)
+  router.push(`/employee/view/${row.id}`)
 }
 
 // 编辑员工
@@ -263,20 +341,38 @@ const handleDelete = (row) => {
       cancelButtonText: '取消',
       type: 'warning',
     }
-  ).then(() => {
-    ElMessage.success(`删除成功：${row.name}`)
-    fetchData()
+  ).then(async () => {
+    try {
+      await employeesStore.deleteEmployee(row.id)
+      ElMessage.success('删除成功')
+      fetchData() // 重新加载数据
+    } catch (error: any) {
+      ElMessage.error(`删除失败: ${error.message || '未知错误'}`)
+    }
   }).catch(() => {
-    ElMessage.info('已取消删除')
+    // 取消操作
   })
 }
 
-// 查看员工工资
+// 工资详情
 const handleSalary = (row) => {
-  router.push(`/salary/detail/${row.id}`)
+  router.push(`/salary/employee/${row.id}`)
 }
 
-onMounted(() => {
+// 初始化
+onMounted(async () => {
+  // 获取部门和职位数据
+  await Promise.all([
+    departmentsStore.getDepartments(),
+    positionsStore.getPositions()
+  ])
+  
+  // 获取员工数据
+  fetchData()
+})
+
+// 监听页面大小变化
+watch([currentPage, pageSize], () => {
   fetchData()
 })
 </script>

@@ -6,26 +6,28 @@ interface Department {
   id: number;
   name: string;
   description?: string;
-  parent_id?: number | null;
   created_at: string;
   updated_at?: string;
   [key: string]: any;
 }
 
+interface DepartmentWithCount extends Department {
+  employee_count: number;
+}
+
 interface DepartmentCreateUpdate {
   name: string;
   description?: string;
-  parent_id?: number | null;
 }
 
 interface QueryParams {
   skip?: number;
   limit?: number;
-  keyword?: string;
 }
 
 export const useDepartmentsStore = defineStore('departments', () => {
   const departments = ref<Department[]>([]);
+  const departmentsWithCount = ref<DepartmentWithCount[]>([]);
   const currentDepartment = ref<Department | null>(null);
   const totalCount = ref<number>(0);
   const isLoading = ref<boolean>(false);
@@ -36,9 +38,9 @@ export const useDepartmentsStore = defineStore('departments', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response: any = await get('/api/v1/departments/', { params });
-      departments.value = response.items;
-      totalCount.value = response.total;
+      const response = await get('/api/v1/departments/', { params });
+      departments.value = response;
+      totalCount.value = response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取部门列表失败';
@@ -48,15 +50,16 @@ export const useDepartmentsStore = defineStore('departments', () => {
     }
   }
 
-  // 获取部门树形结构
-  async function getDepartmentTree() {
+  // 获取部门列表(带员工数量)
+  async function getDepartmentsWithEmployeeCount() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await get('/api/v1/departments/tree');
+      const response = await get('/api/v1/departments/with-employee-count');
+      departmentsWithCount.value = response;
       return response;
     } catch (err: any) {
-      error.value = err.message || '获取部门树形结构失败';
+      error.value = err.message || '获取部门和员工数量失败';
       throw err;
     } finally {
       isLoading.value = false;
@@ -141,12 +144,13 @@ export const useDepartmentsStore = defineStore('departments', () => {
 
   return {
     departments,
+    departmentsWithCount,
     currentDepartment,
     totalCount,
     isLoading,
     error,
     getDepartments,
-    getDepartmentTree,
+    getDepartmentsWithEmployeeCount,
     getDepartment,
     createDepartment,
     updateDepartment,

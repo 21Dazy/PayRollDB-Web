@@ -5,27 +5,32 @@ import { get, post, put, del } from '@/utils/request';
 interface User {
   id: number;
   username: string;
-  email: string;
+  employee_id?: number;
+  role: string;
   is_active: boolean;
-  is_superuser: boolean;
-  full_name?: string;
   created_at: string;
+  last_login?: string;
   [key: string]: any;
 }
 
 interface UserCreateUpdate {
-  username: string;
+  username?: string;
   password?: string;
-  email: string;
-  full_name?: string;
+  employee_id?: number;
+  role?: string;
   is_active?: boolean;
-  is_superuser?: boolean;
+}
+
+interface UserPasswordUpdate {
+  current_password: string;
+  new_password: string;
 }
 
 interface QueryParams {
   skip?: number;
   limit?: number;
-  keyword?: string;
+  role?: string;
+  is_active?: boolean;
 }
 
 export const useUsersStore = defineStore('users', () => {
@@ -40,9 +45,9 @@ export const useUsersStore = defineStore('users', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response: any = await get('/api/v1/users/', { params });
-      users.value = response.items;
-      totalCount.value = response.total;
+      const response = await get('/api/v1/users/', { params });
+      users.value = response;
+      totalCount.value = response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取用户列表失败';
@@ -128,6 +133,21 @@ export const useUsersStore = defineStore('users', () => {
     }
   }
 
+  // 修改密码
+  async function changePassword(userId: number, passwordData: UserPasswordUpdate) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      await post(`/api/v1/users/${userId}/change-password`, passwordData);
+      return true;
+    } catch (err: any) {
+      error.value = err.message || '修改密码失败';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   return {
     users,
     currentUser,
@@ -138,6 +158,7 @@ export const useUsersStore = defineStore('users', () => {
     getUser,
     createUser,
     updateUser,
-    deleteUser
+    deleteUser,
+    changePassword
   };
 }); 

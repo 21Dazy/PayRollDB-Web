@@ -4,7 +4,7 @@ import { post, get } from '@/utils/request';
 
 interface LoginResponse {
   access_token: string;
-  user: any;
+  token_type: string;
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -19,18 +19,21 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await post('/api/v1/auth/login/access-token', {
-        username,
-        password
-      });
+      // 使用FormData发送请求，符合OAuth2规范
+      const formData = new FormData();
+      formData.append('username', username);
+      formData.append('password', password);
+      
+      const response = await post('/api/v1/auth/login', formData);
       
       token.value = response.access_token;
-      user.value = response.user;
       isAuthenticated.value = true;
       
       // 保存到本地存储
       localStorage.setItem('token', response.access_token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      // 获取用户信息
+      await getCurrentUser();
       
       return response;
     } catch (err: any) {
@@ -56,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
     
     isLoading.value = true;
     try {
-      const response = await get('/api/v1/users/me');
+      const response = await get('/api/v1/auth/me');
       user.value = response;
       localStorage.setItem('user', JSON.stringify(response));
       return response;

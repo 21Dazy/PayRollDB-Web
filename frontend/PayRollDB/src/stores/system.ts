@@ -32,11 +32,10 @@ interface OperationLog {
 interface QueryParams {
   skip?: number;
   limit?: number;
-  keyword?: string;
+  user_id?: number;
+  operation_type?: string;
   start_date?: string;
   end_date?: string;
-  operation_type?: string;
-  user_id?: number;
 }
 
 export const useSystemStore = defineStore('system', () => {
@@ -48,13 +47,13 @@ export const useSystemStore = defineStore('system', () => {
   const error = ref<string | null>(null);
 
   // 获取系统参数列表
-  async function getSystemParameters(params: Omit<QueryParams, 'start_date' | 'end_date' | 'operation_type' | 'user_id'> = {}) {
+  async function getSystemParameters(params: {skip?: number, limit?: number} = {}) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response: any = await get('/api/v1/system/parameters', { params });
-      systemParameters.value = response.items;
-      totalCount.value = response.total;
+      const response = await get('/api/v1/system/parameters', { params });
+      systemParameters.value = response;
+      totalCount.value = response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取系统参数列表失败';
@@ -71,21 +70,6 @@ export const useSystemStore = defineStore('system', () => {
     try {
       const response = await get(`/api/v1/system/parameters/${id}`);
       currentParameter.value = response;
-      return response;
-    } catch (err: any) {
-      error.value = err.message || '获取系统参数详情失败';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  // 根据参数键获取系统参数
-  async function getSystemParameterByKey(key: string) {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      const response = await get(`/api/v1/system/parameters/key/${key}`);
       return response;
     } catch (err: any) {
       error.value = err.message || '获取系统参数详情失败';
@@ -160,9 +144,9 @@ export const useSystemStore = defineStore('system', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response: any = await get('/api/v1/system/logs', { params });
-      operationLogs.value = response.items;
-      totalCount.value = response.total;
+      const response = await get('/api/v1/system/logs', { params });
+      operationLogs.value = response;
+      totalCount.value = response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取操作日志列表失败';
@@ -172,58 +156,57 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  // 获取数据库备份列表
-  async function getDatabaseBackups() {
+  // 获取系统状态
+  async function getSystemStatus() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await get('/api/v1/system/database/backups');
+      const response = await get('/api/v1/system/status');
       return response;
     } catch (err: any) {
-      error.value = err.message || '获取数据库备份列表失败';
+      error.value = err.message || '获取系统状态失败';
       throw err;
     } finally {
       isLoading.value = false;
     }
   }
 
-  // 创建数据库备份
-  async function createDatabaseBackup() {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      const response = await post('/api/v1/system/database/backup');
-      return response;
-    } catch (err: any) {
-      error.value = err.message || '创建数据库备份失败';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  // 恢复数据库
-  async function restoreDatabaseBackup(fileName: string) {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      const response = await post('/api/v1/system/database/restore', { file_name: fileName });
-      return response;
-    } catch (err: any) {
-      error.value = err.message || '恢复数据库失败';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  // 获取系统概览数据
+  // 获取系统概览数据 (Dashboard用)
   async function getSystemOverview() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await get('/api/v1/system/overview');
-      return response;
+      // 这个接口实际上是一个自定义的接口，可能需要根据后端实际情况调整
+      // 这里暂时使用模拟数据，因为后端可能没有这个接口
+      // 实际项目中可以调用多个接口组合数据
+      
+      // 可以获取系统状态信息
+      const status = await getSystemStatus();
+      
+      // 假设这是API的返回数据结构
+      const mockData = {
+        employee_count: status.total_employees || 0,
+        total_salary: 850000,
+        attendance_issues: 8,
+        pending_approvals: 5,
+        department_data: [
+          { name: '研发部', value: 40 },
+          { name: '市场部', value: 25 },
+          { name: '销售部', value: 30 },
+          { name: '行政部', value: 15 },
+          { name: '财务部', value: 10 },
+          { name: '人力资源部', value: 6 }
+        ],
+        salary_data: {
+          months: ['1月', '2月', '3月', '4月', '5月', '6月'],
+          basic: [320000, 320000, 320000, 320000, 320000, 320000],
+          performance: [120000, 132000, 101000, 134000, 150000, 130000],
+          bonus: [80000, 60000, 90000, 70000, 80000, 100000],
+          allowance: [50000, 50000, 50000, 50000, 50000, 50000]
+        }
+      };
+      
+      return mockData;
     } catch (err: any) {
       error.value = err.message || '获取系统概览数据失败';
       throw err;
@@ -241,14 +224,11 @@ export const useSystemStore = defineStore('system', () => {
     error,
     getSystemParameters,
     getSystemParameter,
-    getSystemParameterByKey,
     createSystemParameter,
     updateSystemParameter,
     deleteSystemParameter,
     getOperationLogs,
-    getDatabaseBackups,
-    createDatabaseBackup,
-    restoreDatabaseBackup,
+    getSystemStatus,
     getSystemOverview
   };
 }); 

@@ -50,11 +50,19 @@ interface EmployeeSocialSecurityCreateUpdate {
   effective_date: string;
 }
 
+interface BatchEmployeeSocialSecurity {
+  employees: number[];
+  config_id: number;
+  base_number: number;
+  housing_fund_base: number;
+  effective_date: string;
+}
+
 interface QueryParams {
   skip?: number;
   limit?: number;
   employee_id?: number;
-  keyword?: string;
+  department_id?: number;
 }
 
 export const useSocialSecurityStore = defineStore('socialSecurity', () => {
@@ -67,13 +75,13 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
   const error = ref<string | null>(null);
 
   // 获取社保配置列表
-  async function getConfigs(params: QueryParams = {}) {
+  async function getConfigs() {
     isLoading.value = true;
     error.value = null;
     try {
-      const response: any = await get('/api/v1/social-security/configs', { params });
-      configs.value = response.items;
-      totalCount.value = response.total;
+      const response = await get('/api/v1/social-security/configs');
+      configs.value = response;
+      totalCount.value = response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取社保配置列表失败';
@@ -159,14 +167,33 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
     }
   }
 
+  // 设置为默认配置
+  async function setDefaultConfig(id: number) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await put(`/api/v1/social-security/configs/${id}/set-default`);
+      // 更新配置列表中的默认状态
+      configs.value.forEach(config => {
+        config.is_default = config.id === id;
+      });
+      return response;
+    } catch (err: any) {
+      error.value = err.message || '设置默认配置失败';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   // 获取员工社保列表
   async function getEmployeeSocialSecurities(params: QueryParams = {}) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response: any = await get('/api/v1/social-security/employee-configs', { params });
-      employeeSocialSecurities.value = response.items;
-      totalCount.value = response.total;
+      const response = await get('/api/v1/social-security/employees', { params });
+      employeeSocialSecurities.value = response;
+      totalCount.value = response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取员工社保列表失败';
@@ -181,7 +208,7 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await get(`/api/v1/social-security/employee-configs/${id}`);
+      const response = await get(`/api/v1/social-security/employees/${id}`);
       currentEmployeeSocialSecurity.value = response;
       return response;
     } catch (err: any) {
@@ -213,7 +240,7 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await post('/api/v1/social-security/employee-configs', data);
+      const response = await post('/api/v1/social-security/employees', data);
       // 重新获取员工社保列表以更新状态
       await getEmployeeSocialSecurities();
       return response;
@@ -230,9 +257,9 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await put(`/api/v1/social-security/employee-configs/${id}`, data);
+      const response = await put(`/api/v1/social-security/employees/${id}`, data);
       // 更新本地数据
-      const index = employeeSocialSecurities.value.findIndex(config => config.id === id);
+      const index = employeeSocialSecurities.value.findIndex(item => item.id === id);
       if (index !== -1) {
         employeeSocialSecurities.value[index] = { ...employeeSocialSecurities.value[index], ...response };
       }
@@ -253,7 +280,7 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      await del(`/api/v1/social-security/employee-configs/${id}`);
+      await del(`/api/v1/social-security/employees/${id}`);
       // 从本地列表中移除
       employeeSocialSecurities.value = employeeSocialSecurities.value.filter(config => config.id !== id);
       if (currentEmployeeSocialSecurity.value && currentEmployeeSocialSecurity.value.id === id) {
@@ -269,11 +296,11 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
   }
 
   // 批量设置员工社保
-  async function batchSetEmployeeSocialSecurity(data: any) {
+  async function batchSetEmployeeSocialSecurity(data: BatchEmployeeSocialSecurity) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await post('/api/v1/social-security/batch-set', data);
+      const response = await post('/api/v1/social-security/employees/batch', data);
       // 重新获取员工社保列表以更新状态
       await getEmployeeSocialSecurities();
       return response;
@@ -298,6 +325,7 @@ export const useSocialSecurityStore = defineStore('socialSecurity', () => {
     createConfig,
     updateConfig,
     deleteConfig,
+    setDefaultConfig,
     getEmployeeSocialSecurities,
     getEmployeeSocialSecurity,
     getEmployeeSocialSecurityByEmployee,

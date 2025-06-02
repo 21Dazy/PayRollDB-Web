@@ -99,6 +99,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { Plus, User, Money, Warning, Document } from '@element-plus/icons-vue'
+import { useSystemStore } from '@/stores/system'
+import { ElLoading } from 'element-plus'
+
+// 系统数据
+const systemStore = useSystemStore()
+const systemOverview = ref<any>(null)
+const isDataLoaded = ref(false)
 
 // 当前日期
 const now = new Date()
@@ -124,12 +131,48 @@ const greeting = computed(() => {
 })
 
 // 统计卡片数据
-const statCards = ref([
-  { title: '员工总数', value: '126', icon: 'User', color: '#409EFF' },
-  { title: '本月薪资总额', value: '¥862,500', icon: 'Money', color: '#67C23A' },
-  { title: '本月考勤异常', value: '8', icon: 'Warning', color: '#E6A23C' },
-  { title: '待审批', value: '5', icon: 'Document', color: '#F56C6C' }
-])
+const statCards = computed(() => {
+  if (!systemOverview.value) {
+    return [
+      { title: '员工总数', value: '加载中...', icon: 'User', color: '#409EFF' },
+      { title: '本月薪资总额', value: '加载中...', icon: 'Money', color: '#67C23A' },
+      { title: '本月考勤异常', value: '加载中...', icon: 'Warning', color: '#E6A23C' },
+      { title: '待审批', value: '加载中...', icon: 'Document', color: '#F56C6C' }
+    ]
+  }
+  
+  return [
+    { 
+      title: '员工总数', 
+      value: systemOverview.value.employee_count || '0', 
+      icon: 'User', 
+      color: '#409EFF' 
+    },
+    { 
+      title: '本月薪资总额', 
+      value: `¥${formatNumber(systemOverview.value.total_salary || 0)}`, 
+      icon: 'Money', 
+      color: '#67C23A' 
+    },
+    { 
+      title: '本月考勤异常', 
+      value: systemOverview.value.attendance_issues || '0', 
+      icon: 'Warning', 
+      color: '#E6A23C' 
+    },
+    { 
+      title: '待审批', 
+      value: systemOverview.value.pending_approvals || '0', 
+      icon: 'Document', 
+      color: '#F56C6C' 
+    }
+  ]
+})
+
+// 格式化数字为千分位
+function formatNumber(num: number): string {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
 
 // 待办事项
 const todoList = ref([
@@ -152,12 +195,42 @@ const handleDelete = (row: any) => {
   }
 }
 
+// 获取系统概览数据
+const fetchSystemOverview = async () => {
+  try {
+    const loading = ElLoading.service({
+      lock: true,
+      text: '加载数据中...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+    
+    systemOverview.value = await systemStore.getSystemOverview()
+    isDataLoaded.value = true
+    
+    loading.close()
+    
+    // 当数据加载完成后初始化图表
+    initCharts()
+  } catch (error) {
+    console.error('获取系统概览数据失败:', error)
+  }
+}
+
 // 初始化薪资统计图表
 const initSalaryChart = (echarts: any) => {
   const chartDom = document.getElementById('salaryChart')
   if (!chartDom) return
   
   const myChart = echarts.init(chartDom)
+  
+  // 使用API返回的数据或使用默认数据
+  const salaryData = systemOverview.value?.salary_data || {
+    months: ['1月', '2月', '3月', '4月', '5月', '6月'],
+    basic: [320000, 320000, 320000, 320000, 320000, 320000],
+    performance: [120000, 132000, 101000, 134000, 150000, 130000],
+    bonus: [80000, 60000, 90000, 70000, 80000, 100000],
+    allowance: [50000, 50000, 50000, 50000, 50000, 50000]
+  }
   
   const option = {
     tooltip: {
@@ -177,7 +250,7 @@ const initSalaryChart = (echarts: any) => {
     },
     xAxis: {
       type: 'category',
-      data: ['1月', '2月', '3月', '4月', '5月', '6月']
+      data: salaryData.months
     },
     yAxis: {
       type: 'value'
@@ -190,7 +263,7 @@ const initSalaryChart = (echarts: any) => {
         emphasis: {
           focus: 'series'
         },
-        data: [320000, 320000, 320000, 320000, 320000, 320000],
+        data: salaryData.basic,
         color: '#409EFF'
       },
       {
@@ -200,7 +273,7 @@ const initSalaryChart = (echarts: any) => {
         emphasis: {
           focus: 'series'
         },
-        data: [120000, 132000, 101000, 134000, 150000, 130000],
+        data: salaryData.performance,
         color: '#67C23A'
       },
       {
@@ -210,7 +283,7 @@ const initSalaryChart = (echarts: any) => {
         emphasis: {
           focus: 'series'
         },
-        data: [80000, 60000, 90000, 70000, 80000, 100000],
+        data: salaryData.bonus,
         color: '#E6A23C'
       },
       {
@@ -220,7 +293,7 @@ const initSalaryChart = (echarts: any) => {
         emphasis: {
           focus: 'series'
         },
-        data: [50000, 50000, 50000, 50000, 50000, 50000],
+        data: salaryData.allowance,
         color: '#F56C6C'
       }
     ]
@@ -241,6 +314,16 @@ const initDeptChart = (echarts: any) => {
   
   const myChart = echarts.init(chartDom)
   
+  // 使用API返回的数据或使用默认数据
+  const deptData = systemOverview.value?.department_data || [
+    { name: '研发部', value: 40 },
+    { name: '市场部', value: 25 },
+    { name: '销售部', value: 30 },
+    { name: '行政部', value: 15 },
+    { name: '财务部', value: 10 },
+    { name: '人力资源部', value: 6 }
+  ]
+  
   const option = {
     tooltip: {
       trigger: 'item',
@@ -249,39 +332,22 @@ const initDeptChart = (echarts: any) => {
     legend: {
       orient: 'horizontal',
       bottom: 'bottom',
+      data: deptData.map((item: any) => item.name)
     },
     series: [
       {
         name: '部门分布',
         type: 'pie',
-        radius: ['40%', '70%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 10,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: false,
-          position: 'center'
-        },
+        radius: '50%',
+        center: ['50%', '45%'],
+        data: deptData,
         emphasis: {
-          label: {
-            show: true,
-            fontSize: '18',
-            fontWeight: 'bold'
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
           }
-        },
-        labelLine: {
-          show: false
-        },
-        data: [
-          { value: 35, name: '研发部' },
-          { value: 25, name: '市场部' },
-          { value: 30, name: '销售部' },
-          { value: 20, name: '财务部' },
-          { value: 16, name: '人事部' }
-        ]
+        }
       }
     ]
   }
@@ -294,18 +360,17 @@ const initDeptChart = (echarts: any) => {
   })
 }
 
-onMounted(() => {
-  // 动态导入echarts
-  import('echarts').then(module => {
-    const echarts = module
-    // 初始化图表
-    setTimeout(() => {
-      initSalaryChart(echarts)
-      initDeptChart(echarts)
-    }, 100)
-  }).catch(err => {
-    console.error('Failed to load echarts:', err)
+// 初始化所有图表
+const initCharts = () => {
+  import('echarts').then((echarts) => {
+    initSalaryChart(echarts)
+    initDeptChart(echarts)
   })
+}
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchSystemOverview()
 })
 </script>
 

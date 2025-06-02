@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     
     # CORS配置
-    CORS_ORIGINS: List[AnyHttpUrl] = []
+    CORS_ORIGINS: List[Union[AnyHttpUrl, str]] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     
     @validator("CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:

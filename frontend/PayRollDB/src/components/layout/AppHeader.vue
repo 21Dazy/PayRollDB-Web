@@ -69,12 +69,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import defaultAvatar from '@/assets/avatar.png'
+import { useAuthStore } from '@/stores/auth'
+
+// 认证状态管理
+const authStore = useAuthStore()
 
 // 用户信息
-const username = ref('管理员')
+const username = computed(() => {
+  return authStore.user?.full_name || authStore.user?.username || '用户'
+})
 const userAvatar = ref(defaultAvatar)
 
 // 路由
@@ -84,6 +91,17 @@ const route = useRoute()
 // 当前激活菜单
 const activeMenu = computed(() => {
   return route.meta.activeMenu as string || 'dashboard'
+})
+
+// 获取用户信息
+onMounted(async () => {
+  if (authStore.isAuthenticated && !authStore.user) {
+    try {
+      await authStore.getCurrentUser()
+    } catch (error) {
+      console.error('获取用户信息失败', error)
+    }
+  }
 })
 
 // 处理菜单选择
@@ -135,8 +153,16 @@ const handleTheme = () => {
 
 // 处理退出登录
 const handleLogout = () => {
-  // 这里添加登出逻辑
-  router.push('/login')
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    authStore.logout()
+    router.push('/login')
+  }).catch(() => {
+    // 取消登出操作
+  })
 }
 </script>
 

@@ -3,9 +3,12 @@ import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'a
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
+// 获取环境变量中的API基础URL
+const baseURL = ''
+
 // 创建axios实例
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api', // url = base url + request url
+  baseURL, // url = base url + request url
   timeout: 15000, // 请求超时时间
   withCredentials: true, // 跨域请求时发送Cookie
 })
@@ -31,26 +34,8 @@ service.interceptors.request.use(
 // 响应拦截器
 service.interceptors.response.use(
   (response: AxiosResponse) => {
-    const res = response.data
-
-    // 如果自定义代码不是200，则判断为错误
-    if (res.code !== 200) {
-      ElMessage({
-        message: res.message || '请求失败',
-        type: 'error',
-        duration: 5 * 1000,
-      })
-
-      // 401: 未登录或token过期
-      if (res.code === 401) {
-        // 重新登录
-        localStorage.removeItem('token')
-        router.push('/login')
-      }
-      return Promise.reject(new Error(res.message || '请求失败'))
-    } else {
-      return res
-    }
+    // FastAPI 直接返回数据，不需要额外处理
+    return response.data;
   },
   (error) => {
     console.error('请求错误', error)
@@ -58,46 +43,51 @@ service.interceptors.response.use(
     // 处理网络错误
     let message = '请求失败'
     if (error.response) {
-      const status = error.response.status
-      switch (status) {
-        case 400:
-          message = '请求错误'
-          break
-        case 401:
-          message = '未授权，请登录'
-          // 重新登录
-          localStorage.removeItem('token')
-          router.push('/login')
-          break
-        case 403:
-          message = '拒绝访问'
-          break
-        case 404:
-          message = '请求地址出错'
-          break
-        case 408:
-          message = '请求超时'
-          break
-        case 500:
-          message = '服务器内部错误'
-          break
-        case 501:
-          message = '服务未实现'
-          break
-        case 502:
-          message = '网关错误'
-          break
-        case 503:
-          message = '服务不可用'
-          break
-        case 504:
-          message = '网关超时'
-          break
-        case 505:
-          message = 'HTTP版本不受支持'
-          break
-        default:
-          message = `请求失败(${status})`
+      // 提取错误消息
+      if (error.response.data && error.response.data.detail) {
+        message = error.response.data.detail;
+      } else {
+        const status = error.response.status
+        switch (status) {
+          case 400:
+            message = '请求错误'
+            break
+          case 401:
+            message = '未授权，请登录'
+            // 重新登录
+            localStorage.removeItem('token')
+            router.push('/login')
+            break
+          case 403:
+            message = '拒绝访问'
+            break
+          case 404:
+            message = '请求地址出错'
+            break
+          case 408:
+            message = '请求超时'
+            break
+          case 500:
+            message = '服务器内部错误'
+            break
+          case 501:
+            message = '服务未实现'
+            break
+          case 502:
+            message = '网关错误'
+            break
+          case 503:
+            message = '服务不可用'
+            break
+          case 504:
+            message = '网关超时'
+            break
+          case 505:
+            message = 'HTTP版本不受支持'
+            break
+          default:
+            message = `请求失败(${status})`
+        }
       }
     } else if (error.request) {
       message = '服务器未响应'

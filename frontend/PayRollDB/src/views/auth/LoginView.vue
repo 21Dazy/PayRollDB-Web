@@ -46,10 +46,10 @@
         <el-button 
           type="primary" 
           class="login-button" 
-          :loading="loading" 
+          :loading="authStore.isLoading" 
           @click="handleLogin"
         >
-          {{ loading ? '登录中...' : '登 录' }}
+          {{ authStore.isLoading ? '登录中...' : '登 录' }}
         </el-button>
         
         <div class="register-link" v-if="activeTab === 'admin'">
@@ -64,11 +64,16 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, FormInstance } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 // 路由
 const router = useRouter()
+
+// 认证状态管理
+const authStore = useAuthStore()
 
 // 登录表单
 const loginFormRef = ref<FormInstance>()
@@ -91,32 +96,29 @@ const loginRules = {
 // 记住我
 const rememberMe = ref(false)
 
-// 登录加载状态
-const loading = ref(false)
-
 // 当前激活的标签页
 const activeTab = ref('employee')
 
 // 处理登录
 const handleLogin = () => {
-  loginFormRef.value?.validate((valid) => {
+  loginFormRef.value?.validate(async (valid) => {
     if (valid) {
-      loading.value = true
-      
-      // 模拟登录请求
-      setTimeout(() => {
-        loading.value = false
-        
-        // 模拟登录成功
+      try {
+        await authStore.login(loginForm.username, loginForm.password)
         ElMessage.success('登录成功')
         
-        // 存储登录状态
-        localStorage.setItem('token', 'mock-token')
-        localStorage.setItem('userRole', activeTab.value)
+        // 如果记住我，可以在这里处理额外的本地存储
+        if (rememberMe.value) {
+          localStorage.setItem('remember_username', loginForm.username)
+        } else {
+          localStorage.removeItem('remember_username')
+        }
         
         // 跳转到首页
         router.push('/dashboard')
-      }, 1500)
+      } catch (error: any) {
+        ElMessage.error(error.message || '登录失败，请检查用户名和密码')
+      }
     }
   })
 }

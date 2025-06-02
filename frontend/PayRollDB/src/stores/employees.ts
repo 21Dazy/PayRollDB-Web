@@ -16,7 +16,7 @@ interface Employee {
   bank_name?: string;
   bank_account?: string;
   basic_salary: number;
-  status: string;
+  status: boolean;  // true为在职，false为离职
   created_at: string;
   updated_at?: string;
   department?: any;
@@ -37,16 +37,20 @@ interface EmployeeCreateUpdate {
   bank_name?: string;
   bank_account?: string;
   basic_salary: number;
-  status?: string;
+  status?: boolean;
+}
+
+interface EmployeeLeaveRequest {
+  leave_date: string;
 }
 
 interface QueryParams {
   skip?: number;
   limit?: number;
-  keyword?: string;
+  name?: string;
   department_id?: number;
   position_id?: number;
-  status?: string;
+  status?: boolean;
 }
 
 export const useEmployeesStore = defineStore('employees', () => {
@@ -61,9 +65,9 @@ export const useEmployeesStore = defineStore('employees', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response: any = await get('/api/v1/employees/', { params });
-      employees.value = response.items;
-      totalCount.value = response.total;
+      const response = await get('/api/v1/employees/', { params });
+      employees.value = response;
+      totalCount.value = response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取员工列表失败';
@@ -129,67 +133,61 @@ export const useEmployeesStore = defineStore('employees', () => {
     }
   }
 
-  // 删除员工
-  async function deleteEmployee(id: number) {
+  // 设置员工离职
+  async function setEmployeeLeave(id: number, leaveData: EmployeeLeaveRequest) {
     isLoading.value = true;
     error.value = null;
     try {
-      await del(`/api/v1/employees/${id}`);
-      // 从本地列表中移除
-      employees.value = employees.value.filter(emp => emp.id !== id);
-      if (currentEmployee.value && currentEmployee.value.id === id) {
-        currentEmployee.value = null;
+      const response = await put(`/api/v1/employees/${id}/leave`, leaveData);
+      // 更新本地数据
+      const index = employees.value.findIndex(emp => emp.id === id);
+      if (index !== -1) {
+        employees.value[index] = { ...employees.value[index], ...response, status: false };
       }
-      return true;
+      if (currentEmployee.value && currentEmployee.value.id === id) {
+        currentEmployee.value = { ...currentEmployee.value, ...response, status: false };
+      }
+      return response;
     } catch (err: any) {
-      error.value = err.message || '删除员工失败';
+      error.value = err.message || '设置员工离职失败';
       throw err;
     } finally {
       isLoading.value = false;
     }
   }
 
-  // 获取部门下的所有员工
-  async function getEmployeesByDepartment(departmentId: number) {
-    return getEmployees({ department_id: departmentId });
-  }
-
-  // 导入员工数据
-  async function importEmployees(file: File) {
+  // 获取员工工资记录
+  async function getEmployeeSalaries(id: number, year?: number, month?: number) {
     isLoading.value = true;
     error.value = null;
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const params: any = {};
+      if (year) params.year = year;
+      if (month) params.month = month;
       
-      const response = await post('/api/v1/employees/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      // 重新获取员工列表以更新状态
-      await getEmployees();
+      const response = await get(`/api/v1/employees/${id}/salaries`, { params });
       return response;
     } catch (err: any) {
-      error.value = err.message || '导入员工数据失败';
+      error.value = err.message || '获取员工工资记录失败';
       throw err;
     } finally {
       isLoading.value = false;
     }
   }
 
-  // 导出员工数据
-  async function exportEmployees(params: QueryParams = {}) {
+  // 获取员工考勤记录
+  async function getEmployeeAttendance(id: number, startDate?: string, endDate?: string) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await get('/api/v1/employees/export', { 
-        params,
-        responseType: 'blob'
-      });
+      const params: any = {};
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+      
+      const response = await get(`/api/v1/employees/${id}/attendance`, { params });
       return response;
     } catch (err: any) {
-      error.value = err.message || '导出员工数据失败';
+      error.value = err.message || '获取员工考勤记录失败';
       throw err;
     } finally {
       isLoading.value = false;
@@ -206,9 +204,8 @@ export const useEmployeesStore = defineStore('employees', () => {
     getEmployee,
     createEmployee,
     updateEmployee,
-    deleteEmployee,
-    getEmployeesByDepartment,
-    importEmployees,
-    exportEmployees
+    setEmployeeLeave,
+    getEmployeeSalaries,
+    getEmployeeAttendance
   };
 }); 
