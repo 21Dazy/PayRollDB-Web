@@ -10,4 +10,7 @@ class SalaryItem(Base):
     name = Column(String(50), nullable=False, comment='项目名称')
     type = Column(Enum('addition', 'deduction', name='salary_item_type'), nullable=False, comment='类型(addition:加项, deduction:减项)')
     is_percentage = Column(Boolean, default=False, comment='是否百分比(1:是, 0:否)')
-    is_system = Column(Boolean, default=False, comment='是否系统项(1:是, 0:否)') 
+    is_system = Column(Boolean, default=False, comment='是否系统项(1:是, 0:否)')
+    
+    # 关系
+    employee_configs = relationship("EmployeeSalaryConfig", back_populates="salary_item") 

@@ -11,4 +11,5 @@ class Department(Base):
     description = Column(String(255), comment='部门描述')
     
     # 关系
-    employees = relationship("Employee", back_populates="department") 
+    employees = relationship("Employee", back_populates="department")
+    positions = relationship("Position", back_populates="department") 

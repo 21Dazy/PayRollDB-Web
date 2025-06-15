@@ -15,8 +15,18 @@ from app.schemas.salary import (
     SalaryItemCreate, SalaryItemUpdate, SalaryItemResponse,
     SalaryRecordCreate, SalaryRecordUpdate, SalaryRecordResponse,
     SalaryRecordDetailResponse, SalaryDetailResponse,
-    SalaryPaymentRequest, SalaryPaymentResponse
+    SalaryPaymentRequest, SalaryPaymentResponse, PaginatedResponse
 )
+from app.schemas.salary_config import (
+    EmployeeSalaryConfig,
+    EmployeeSalaryConfigCreate,
+    EmployeeSalaryConfigUpdate,
+    SalaryConfigItemInDB,
+    SalaryGenerateRequest,
+    SalaryGenerateResponse
+)
+from app.crud.crud_salary_config import salary_config as crud_salary_config
+from app.services.salary_service import SalaryService
 from app.utils.log import log_operation
 
 router = APIRouter()
@@ -172,7 +182,7 @@ def delete_salary_item(
     return None
 
 # 工资记录相关接口
-@router.get("/records", response_model=List[SalaryRecordResponse])
+@router.get("/records", response_model=PaginatedResponse)
 def read_salary_records(
     skip: int = 0,
     limit: int = 100,
@@ -181,13 +191,16 @@ def read_salary_records(
     year: Optional[int] = None,
     month: Optional[int] = None,
     status: Optional[str] = None,
+    keyword: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
+    # 打印接收到的参数，用于调试
+    print(f"接收到的参数: skip={skip}, limit={limit}, year={year}, month={month}, department_id={department_id}, status={status}, keyword={keyword}")
     """
     获取工资记录列表
     """
-    query = db.query(SalaryRecord).join(Employee)
+    query = db.query(SalaryRecord).join(Employee).join(Employee.department)
     
     # 应用筛选条件
     if department_id is not None:
@@ -204,8 +217,51 @@ def read_salary_records(
     
     if status is not None:
         query = query.filter(SalaryRecord.status == status)
+        
+    if keyword:
+        query = query.filter(Employee.name.ilike(f"%{keyword}%"))
     
-    return query.offset(skip).limit(limit).all()
+    # 计算总数
+    total = query.count()
+    
+    # 获取分页数据
+    records = query.offset(skip).limit(limit).all()
+    
+    # 转换为响应格式，添加员工和部门信息
+    result = []
+    for record in records:
+        employee = record.employee
+        # 创建一个新的字典，只包含需要的属性，避免包含SQLAlchemy对象
+        record_dict = {
+            "id": record.id,
+            "employeeId": record.employee_id,
+            "year": record.year,
+            "month": record.month,
+            "baseSalary": record.base_salary,
+            "overtimePay": record.overtime_pay,
+            "bonus": record.bonus,
+            "deduction": record.deduction,
+            "socialSecurity": record.social_security,
+            "personalTax": record.personal_tax,
+            "netSalary": record.net_salary,
+            "status": record.status,
+            "paymentDate": record.payment_date,
+            "remark": record.remark,
+            "createdAt": record.created_at,
+            "updatedAt": record.updated_at,
+            "employeeName": employee.name if employee else None,
+            "departmentName": employee.department.name if employee and employee.department else None,
+            "positionName": employee.position.name if employee and employee.position else None,
+            "bankName": employee.bank_name if employee else None,
+            "bankAccount": employee.bank_account if employee else None
+        }
+        result.append(record_dict)
+    
+    # 返回带有总数的响应
+    return {
+        "items": result,
+        "total": total
+    }
 
 @router.post("/records", response_model=SalaryRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_salary_record(
@@ -297,7 +353,48 @@ def read_salary_record(
             detail="工资记录不存在"
         )
     
-    return record
+    # 确保加载所有关联数据
+    details = []
+    for detail in record.details:
+        if detail.item:
+            details.append({
+                "id": detail.id,
+                "item": {
+                    "id": detail.item.id,
+                    "name": detail.item.name,
+                    "type": detail.item.type,
+                    "is_percentage": detail.item.is_percentage,
+                    "is_system": detail.item.is_system,
+                    "created_at": detail.item.created_at,
+                    "updated_at": detail.item.updated_at
+                },
+                "amount": detail.amount,
+                "created_at": detail.created_at,
+                "updated_at": detail.updated_at
+            })
+    
+    # 构建详细响应
+    response_data = {
+        "id": record.id,
+        "employee": record.employee,
+        "year": record.year,
+        "month": record.month,
+        "base_salary": record.base_salary,
+        "overtime_pay": record.overtime_pay,
+        "bonus": record.bonus,
+        "deduction": record.deduction,
+        "social_security": record.social_security,
+        "personal_tax": record.personal_tax,
+        "net_salary": record.net_salary,
+        "status": record.status,
+        "payment_date": record.payment_date,
+        "remark": record.remark,
+        "created_at": record.created_at,
+        "updated_at": record.updated_at,
+        "details": details
+    }
+    
+    return response_data
 
 @router.put("/records/{record_id}", response_model=SalaryRecordResponse)
 def update_salary_record(
@@ -421,4 +518,198 @@ def export_salaries(
     return Response(
         content="导出功能待实现",
         media_type="text/plain"
-    ) 
+    )
+
+# 薪资配置相关接口
+@router.get("/config/{employee_id}", response_model=EmployeeSalaryConfig)
+def get_employee_salary_config(
+    *,
+    db: Session = Depends(get_db),
+    employee_id: int,
+    effective_date: date = None,
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    获取员工薪资配置
+    """
+    # 检查员工是否存在
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="员工不存在")
+    
+    # 获取配置
+    print(f"获取员工 {employee_id} ({employee.name}) 的薪资配置")
+    configs = crud_salary_config.get_employee_config(
+        db=db, 
+        employee_id=employee_id,
+        effective_date=effective_date or date.today()
+    )
+    
+    print(f"获取到 {len(configs)} 条薪资配置")
+    
+    # 转换为响应格式
+    items = []
+    for config in configs:
+        # 确保薪资项目存在
+        salary_item = db.query(SalaryItem).filter(SalaryItem.id == config.item_id).first()
+        if not salary_item:
+            print(f"警告: 薪资配置 {config.id} 引用了不存在的薪资项目 {config.item_id}")
+            continue
+            
+        print(f"处理薪资配置: item_id={config.item_id}, item_name={salary_item.name}, value={config.value}")
+        
+        item = SalaryConfigItemInDB(
+            id=config.id,
+            employee_id=config.employee_id,
+            item_id=config.item_id,
+            value=config.value,
+            base_item=config.base_item,
+            is_active=config.is_active,
+            effective_date=config.effective_date,
+            item_name=salary_item.name,
+            type=salary_item.type,
+            is_percentage=salary_item.is_percentage,
+            is_system=salary_item.is_system
+        )
+        items.append(item)
+    
+    # 如果没有配置，添加默认的基本工资配置
+    if not items:
+        print(f"员工 {employee_id} 没有薪资配置，尝试添加默认基本工资配置")
+        base_salary_item = db.query(SalaryItem).filter(SalaryItem.name == '基本工资').first()
+        if base_salary_item and employee.base_salary:
+            print(f"添加默认基本工资配置: {employee.base_salary}")
+            # 创建默认配置
+            default_config = EmployeeSalaryConfig(
+                employee_id=employee_id,
+                item_id=base_salary_item.id,
+                value=employee.base_salary,
+                is_active=True,
+                effective_date=date.today()
+            )
+            db.add(default_config)
+            db.commit()
+            db.refresh(default_config)
+            
+            # 添加到响应中
+            items.append(SalaryConfigItemInDB(
+                id=default_config.id,
+                employee_id=default_config.employee_id,
+                item_id=base_salary_item.id,
+                value=employee.base_salary,
+                base_item=None,
+                is_active=True,
+                effective_date=date.today(),
+                item_name=base_salary_item.name,
+                type=base_salary_item.type,
+                is_percentage=base_salary_item.is_percentage,
+                is_system=base_salary_item.is_system
+            ))
+    
+    return EmployeeSalaryConfig(employee_id=employee_id, items=items)
+
+@router.put("/config/{employee_id}", response_model=EmployeeSalaryConfig)
+def update_employee_salary_config(
+    *,
+    db: Session = Depends(get_db),
+    employee_id: int,
+    config_in: EmployeeSalaryConfigUpdate,
+    current_user: User = Depends(get_current_hr_user),
+) -> Any:
+    """
+    更新员工薪资配置
+    """
+    # 检查员工是否存在
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="员工不存在")
+    
+    # 检查薪资项目是否存在
+    print(f"更新员工 {employee_id} ({employee.name}) 的薪资配置")
+    print(f"收到 {len(config_in.items)} 条薪资配置项")
+    
+    for item in config_in.items:
+        salary_item = db.query(SalaryItem).filter(SalaryItem.id == item.item_id).first()
+        if not salary_item:
+            raise HTTPException(status_code=400, detail=f"薪资项目 ID {item.item_id} 不存在")
+        print(f"薪资项目: {item.item_id} - {salary_item.name}, 值: {item.value}")
+    
+    # 更新配置
+    configs = crud_salary_config.update_employee_config(
+        db=db,
+        employee_id=employee_id,
+        config_items=config_in.items
+    )
+    
+    print(f"更新了 {len(configs)} 条薪资配置")
+    
+    # 转换为响应格式
+    items = []
+    for config in configs:
+        # 确保薪资项目存在
+        salary_item = db.query(SalaryItem).filter(SalaryItem.id == config.item_id).first()
+        if not salary_item:
+            print(f"警告: 薪资配置 {config.id} 引用了不存在的薪资项目 {config.item_id}")
+            continue
+            
+        print(f"处理薪资配置: item_id={config.item_id}, item_name={salary_item.name}, value={config.value}")
+        
+        item = SalaryConfigItemInDB(
+            id=config.id,
+            employee_id=config.employee_id,
+            item_id=config.item_id,
+            value=config.value,
+            base_item=config.base_item,
+            is_active=config.is_active,
+            effective_date=config.effective_date,
+            item_name=salary_item.name,
+            type=salary_item.type,
+            is_percentage=salary_item.is_percentage,
+            is_system=salary_item.is_system
+        )
+        items.append(item)
+    
+    log_operation(
+        db=db,
+        user_id=current_user.id,
+        operation_type="更新员工薪资配置",
+        operation_detail=f"更新了员工 {employee.name} (ID: {employee_id}) 的薪资配置"
+    )
+    
+    return EmployeeSalaryConfig(employee_id=employee_id, items=items)
+
+@router.post("/generate", response_model=SalaryGenerateResponse)
+def generate_salary_records(
+    *,
+    db: Session = Depends(get_db),
+    request: SalaryGenerateRequest,
+    current_user: User = Depends(get_current_hr_user),
+) -> Any:
+    """
+    批量生成薪资记录
+    """
+    try:
+        service = SalaryService(db)
+        result = service.generate_salary_records(
+            year=request.year,
+            month=request.month,
+            department_id=request.department_id,
+            employee_ids=request.employee_ids
+        )
+        
+        log_operation(
+            db=db,
+            user_id=current_user.id,
+            operation_type="批量生成薪资记录",
+            operation_detail=f"生成了 {request.year}年{request.month}月 的薪资记录，成功{result['generated_count']}条，失败{result.get('failed_count', 0)}条"
+        )
+        
+        return SalaryGenerateResponse(
+            success=True,
+            message=f"成功生成{result['generated_count']}条薪资记录",
+            generated_count=result['generated_count'],
+            failed_count=result.get('failed_count', 0),
+            errors=result.get('errors', [])
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) 

@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 from pydantic import BaseModel, Field
 from enum import Enum
@@ -133,7 +133,11 @@ class SalaryRecordInDB(SalaryRecordBase):
 
 # 工资记录响应模型 - 基本信息
 class SalaryRecordResponse(SalaryRecordInDB):
-    pass
+    employeeName: Optional[str] = None
+    departmentName: Optional[str] = None
+    positionName: Optional[str] = None
+    bankName: Optional[str] = None
+    bankAccount: Optional[str] = None
 
 # 工资记录响应模型 - 带员工信息
 class SalaryRecordDetailResponse(BaseModel):
@@ -156,4 +160,9 @@ class SalaryRecordDetailResponse(BaseModel):
     details: List[SalaryDetailWithItemResponse] = []
 
     class Config:
-        orm_mode = True 
+        orm_mode = True
+        
+# 分页响应模型
+class PaginatedResponse(BaseModel):
+    items: List[Dict[str, Any]]
+    total: int 

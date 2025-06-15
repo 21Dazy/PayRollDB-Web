@@ -94,25 +94,30 @@ const loginRules = {
 }
 
 // 记住我
-const rememberMe = ref(false)
+const rememberMe = ref(true)
 
 // 当前激活的标签页
 const activeTab = ref('employee')
+
+// 初始化表单数据
+const initForm = () => {
+  // 如果有记住的用户名，自动填充
+  if (authStore.lastUsername) {
+    loginForm.username = authStore.lastUsername
+  }
+}
+
+// 页面加载时初始化
+initForm()
 
 // 处理登录
 const handleLogin = () => {
   loginFormRef.value?.validate(async (valid) => {
     if (valid) {
       try {
-        await authStore.login(loginForm.username, loginForm.password)
+        // 传递rememberMe参数
+        await authStore.login(loginForm.username, loginForm.password, rememberMe.value)
         ElMessage.success('登录成功')
-        
-        // 如果记住我，可以在这里处理额外的本地存储
-        if (rememberMe.value) {
-          localStorage.setItem('remember_username', loginForm.username)
-        } else {
-          localStorage.removeItem('remember_username')
-        }
         
         // 跳转到首页
         router.push('/dashboard')

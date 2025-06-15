@@ -41,6 +41,18 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { 
+  Calendar, 
+  Money, 
+  User, 
+  Setting, 
+  PieChart, 
+  Expand, 
+  Fold, 
+  DataBoard,
+  OfficeBuilding,
+  Suitcase
+} from '@element-plus/icons-vue'
 
 // 侧边栏菜单
 const sideMenus = ref([
@@ -51,6 +63,7 @@ const sideMenus = ref([
     children: [
       { key: 'salary-list', title: '薪资列表' },
       { key: 'salary-pay', title: '薪资发放' },
+      { key: 'salary-items', title: '薪资项目' },
       { key: 'salary-config', title: '薪资配置' },
       { key: 'salary-statistics', title: '薪资统计' }
     ]
@@ -61,9 +74,25 @@ const sideMenus = ref([
     icon: 'User',
     children: [
       { key: 'employee-list', title: '员工列表' },
-      { key: 'employee-add', title: '添加员工' },
-      { key: 'employee-department', title: '部门管理' },
-      { key: 'employee-position', title: '职位管理' }
+      { key: 'employee-add', title: '添加员工' }
+    ]
+  },
+  {
+    key: 'department',
+    title: '部门管理',
+    icon: 'OfficeBuilding',
+    children: [
+      { key: 'department-list', title: '部门列表' },
+      { key: 'department-add', title: '添加部门' }
+    ]
+  },
+  {
+    key: 'position',
+    title: '职位管理',
+    icon: 'Suitcase',
+    children: [
+      { key: 'position-list', title: '职位列表' },
+      { key: 'position-add', title: '添加职位' }
     ]
   },
   {
@@ -107,13 +136,27 @@ const route = useRoute()
 // 当前激活菜单
 const activeMenu = computed(() => {
   const currentPath = route.path
-  if (currentPath.includes('dashboard')) {
+  
+  if (currentPath === '/dashboard') {
     return 'dashboard'
   }
   
   // 从路径提取菜单key
-  const pathSegments = currentPath.split('/')
-  return pathSegments.length > 1 ? pathSegments[pathSegments.length - 1] : 'dashboard'
+  const pathSegments = currentPath.split('/').filter(segment => segment !== '')
+  
+  if (pathSegments.length >= 2) {
+    const mainRoute = pathSegments[0]
+    const subRoute = pathSegments[1]
+    
+    // 如果是查看、编辑等详情页面，只返回主路由
+    if (pathSegments.length > 2 && ['view', 'edit', 'detail'].includes(subRoute)) {
+      return `${mainRoute}-list`
+    }
+    
+    return `${mainRoute}-${subRoute}`
+  }
+  
+  return 'dashboard'
 })
 
 // 是否折叠
@@ -136,13 +179,17 @@ const handleSelect = (key: string) => {
   }
   
   // 将菜单键转换为路由路径
-  let routePath = '/' + key.replace('-', '/')
-  if (key.split('-').length === 1) {
-    // 如果是一级菜单，添加默认子路由
-    routePath += '/list'
-  }
+  const menuParts = key.split('-')
   
-  router.push(routePath)
+  if (menuParts.length === 1) {
+    // 如果是一级菜单，添加默认子路由
+    router.push(`/${menuParts[0]}/list`)
+  } else {
+    // 如果是二级菜单，构建路由
+    const mainRoute = menuParts[0]
+    const subRoute = menuParts[1]
+    router.push(`/${mainRoute}/${subRoute}`)
+  }
 }
 </script>
 

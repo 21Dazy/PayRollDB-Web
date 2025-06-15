@@ -7,6 +7,7 @@ interface Position {
   name: string;
   description?: string;
   department_id: number;
+  department_name?: string;
   salary_range_min?: number;
   salary_range_max?: number;
   created_at: string;
@@ -37,17 +38,43 @@ export const usePositionsStore = defineStore('positions', () => {
   const isLoading = ref<boolean>(false);
   const error = ref<string | null>(null);
 
+  // 初始化函数
+  function initialize() {
+    // 确保positions至少是空数组
+    if (!positions.value) {
+      positions.value = [];
+    }
+  }
+
+  // 立即执行初始化
+  initialize();
+
   // 获取职位列表
   async function getPositions(params: QueryParams = {}) {
     isLoading.value = true;
     error.value = null;
     try {
       const response: any = await get('/api/v1/positions/', { params });
-      positions.value = response.items;
-      totalCount.value = response.total;
+      // 根据返回的数据结构，检查并处理不同形式的响应
+      if (Array.isArray(response)) {
+        // 如果响应直接是数组
+        positions.value = response;
+        totalCount.value = response.length;
+      } else if (response && response.items) {
+        // 如果响应是包含 items 的对象
+        positions.value = response.items;
+        totalCount.value = response.total || response.items.length;
+      } else {
+        // 如果响应是其他格式，尝试直接使用
+        positions.value = response || [];
+        totalCount.value = Array.isArray(response) ? response.length : 0;
+      }
+      
+      console.log('获取到的职位数据:', positions.value);
       return response;
     } catch (err: any) {
       error.value = err.message || '获取职位列表失败';
+      console.error('获取职位列表失败:', err);
       throw err;
     } finally {
       isLoading.value = false;
@@ -132,7 +159,18 @@ export const usePositionsStore = defineStore('positions', () => {
 
   // 获取部门下的所有职位
   async function getPositionsByDepartment(departmentId: number) {
-    return getPositions({ department_id: departmentId });
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await get(`/api/v1/positions/by-department/${departmentId}`);
+      return response;
+    } catch (err: any) {
+      error.value = err.message || `获取部门(ID: ${departmentId})下的职位失败`;
+      console.error(`获取部门下的职位失败:`, err);
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   return {

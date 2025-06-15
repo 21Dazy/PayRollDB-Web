@@ -25,13 +25,13 @@
           
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="工号" prop="employeeId">
-                <el-input v-model="form.employeeId" placeholder="请输入工号" />
+              <el-form-item label="姓名" prop="name">
+                <el-input v-model="form.name" placeholder="请输入姓名" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="姓名" prop="name">
-                <el-input v-model="form.name" placeholder="请输入姓名" />
+              <el-form-item label="身份证号" prop="idCard">
+                <el-input v-model="form.idCard" placeholder="请输入身份证号" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -104,17 +104,6 @@
                 />
               </el-form-item>
             </el-col>
-            <el-col :span="12">
-              <el-form-item label="绩效基数" prop="performanceBase">
-                <el-input-number
-                  v-model="form.performanceBase"
-                  :min="0"
-                  :precision="2"
-                  :step="500"
-                  style="width: 100%"
-                />
-              </el-form-item>
-            </el-col>
           </el-row>
         </el-card>
         
@@ -162,19 +151,6 @@
               </el-form-item>
             </el-col>
           </el-row>
-          
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="开户支行" prop="bankBranch">
-                <el-input v-model="form.bankBranch" placeholder="请输入开户支行" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="账户名" prop="bankAccountName">
-                <el-input v-model="form.bankAccountName" placeholder="请输入账户名" />
-              </el-form-item>
-            </el-col>
-          </el-row>
         </el-card>
       </el-form>
     </div>
@@ -182,58 +158,73 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, FormInstance } from 'element-plus'
+import { ElMessage, type FormInstance } from 'element-plus'
+import { useEmployeesStore } from '@/stores/employees'
+import { useDepartmentsStore } from '@/stores/departments'
+import { usePositionsStore } from '@/stores/positions'
+import { useAuthStore } from '@/stores/auth'
 
-// 路由
+// 路由和Store
 const router = useRouter()
+const employeesStore = useEmployeesStore()
+const departmentsStore = useDepartmentsStore()
+const positionsStore = usePositionsStore()
+const authStore = useAuthStore()
 
-// 表单引用
-const formRef = ref<FormInstance>()
-
-// 部门选项
-const departmentOptions = ref([
-  { value: '1', label: '研发部' },
-  { value: '2', label: '市场部' },
-  { value: '3', label: '销售部' },
-  { value: '4', label: '财务部' },
-  { value: '5', label: '人事部' }
-])
-
-// 职位选项
-const positionOptions = ref([
-  { value: '1', label: '总监' },
-  { value: '2', label: '经理' },
-  { value: '3', label: '主管' },
-  { value: '4', label: '工程师' },
-  { value: '5', label: '专员' }
-])
+// 状态定义
+const loading = ref(false)
+const formRef = ref<FormInstance | null>(null)
 
 // 表单数据
 const form = reactive({
-  employeeId: '',
   name: '',
   departmentId: '',
   positionId: '',
   hireDate: '',
   status: 1,
   baseSalary: 0,
-  performanceBase: 0,
   phone: '',
   email: '',
   address: '',
   bankName: '',
   bankAccount: '',
-  bankBranch: '',
-  bankAccountName: ''
+  idCard: ''
+})
+
+// 计算属性
+const departmentOptions = computed(() => {
+  return (departmentsStore.departments || []).map(dept => ({
+    value: dept.id,
+    label: dept.name
+  }))
+})
+
+const positionOptions = computed(() => {
+  if (!positionsStore.positions || positionsStore.positions.length === 0) {
+    console.log('职位数据未加载')
+    return []
+  }
+  
+  if (!form.departmentId) {
+    console.log('未选择部门')
+    return []
+  }
+  
+  const filtered = positionsStore.positions
+    .filter(pos => pos.department_id === parseInt(form.departmentId))
+    .map(pos => ({
+      value: pos.id,
+      label: pos.name
+    }))
+  
+  console.log(`部门${form.departmentId}的职位选项:`, filtered)
+  return filtered
 })
 
 // 表单验证规则
 const rules = {
-  employeeId: [
-    { required: true, message: '请输入工号', trigger: 'blur' }
-  ],
   name: [
     { required: true, message: '请输入姓名', trigger: 'blur' }
   ],
@@ -257,34 +248,144 @@ const rules = {
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
   ],
   email: [
-    { required: true, message: '请输入电子邮箱', trigger: 'blur' },
     { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+  ],
+  idCard: [
+    { required: true, message: '请输入身份证号', trigger: 'blur' }
   ]
 }
 
-// 加载状态
-const loading = ref(false)
+// 监听器
+watch(() => form.departmentId, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    form.positionId = ''
+  }
+})
 
-// 返回
+// 方法
 const goBack = () => {
   router.go(-1)
 }
 
-// 提交表单
-const handleSubmit = () => {
-  formRef.value?.validate((valid) => {
+const formatDate = (date: any) => {
+  if (date && typeof date.toISOString === 'function') {
+    return date.toISOString().split('T')[0]
+  }
+  return undefined
+}
+
+const handleSubmit = async () => {
+  if (!formRef.value) {
+    console.error('表单引用不存在')
+    return
+  }
+  
+  // 打印用户和Token信息，用于调试
+  console.log('当前Token:', localStorage.getItem('token'))
+  console.log('当前用户信息:', localStorage.getItem('user'))
+  
+  await formRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true
       
-      // 模拟提交
-      setTimeout(() => {
-        loading.value = false
-        ElMessage.success('添加成功')
+      try {
+        // 准备要发送的数据，确保字段名与后端模型一致
+        const employeeData = {
+          name: form.name,
+          id_card: form.idCard,
+          department_id: parseInt(form.departmentId),
+          position_id: parseInt(form.positionId),
+          hire_date: formatDate(form.hireDate),
+          base_salary: Number(form.baseSalary),
+          phone: form.phone,
+          email: form.email || '',
+          address: form.address || '',
+          bank_name: form.bankName || '',
+          bank_account: form.bankAccount || '',
+          status: form.status === 1
+        }
+        
+        console.log('提交的员工数据:', employeeData)
+        
+        // 调用 store 中的创建员工方法
+        await employeesStore.createEmployee(employeeData)
+        
+        ElMessage.success('员工添加成功')
         router.push('/employee/list')
-      }, 1500)
+      } catch (error: any) {
+        console.error('添加员工失败:', error)
+        
+        // 详细处理错误响应
+        if (error.response) {
+          console.error('错误响应:', error.response)
+          console.error('错误状态码:', error.response.status)
+          console.error('错误数据:', error.response.data)
+          
+          // 针对422错误提供更详细的反馈
+          if (error.response.status === 422) {
+            const errorDetails = error.response.data.detail || []
+            if (Array.isArray(errorDetails)) {
+              const errorMessages = errorDetails.map((err: any) => {
+                return `${err.loc.join('.')}：${err.msg}`
+              }).join('\n')
+              ElMessage.error(`提交数据验证失败:\n${errorMessages}`)
+            } else {
+              ElMessage.error(`提交数据验证失败: ${JSON.stringify(error.response.data)}`)
+            }
+          } else {
+            ElMessage.error(`添加失败: ${error.message || '未知错误'} (${error.response.status})`)
+          }
+        } else {
+          ElMessage.error(`添加失败: ${error.message || '未知错误'}`)
+        }
+      } finally {
+        loading.value = false
+      }
     }
   })
 }
+
+// 确保首次加载时数据存在
+const initializeStores = () => {
+  if (!positionsStore.positions) {
+    positionsStore.positions = []
+  }
+
+  if (!departmentsStore.departments) {
+    departmentsStore.departments = []
+  }
+}
+
+// 生命周期钩子
+onMounted(async () => {
+  console.log('组件开始挂载')
+  try {
+    loading.value = true
+    
+    // 刷新用户信息，确保token有效
+    await authStore.refreshUserInfo()
+    console.log('当前用户信息:', authStore.user)
+    
+    // 确保存储区已初始化
+    initializeStores()
+    
+    // 获取部门和职位数据
+    await Promise.all([
+      departmentsStore.getDepartments(),
+      positionsStore.getPositions()
+    ])
+    
+    console.log('数据加载完成:', {
+      departments: departmentsStore.departments,
+      positions: positionsStore.positions
+    })
+  } catch (error: any) {
+    console.error('数据加载失败:', error)
+    ElMessage.error(`数据加载失败: ${error.message || '未知错误'}`)
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <style scoped lang="scss">

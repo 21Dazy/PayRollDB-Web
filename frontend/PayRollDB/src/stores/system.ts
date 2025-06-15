@@ -176,42 +176,33 @@ export const useSystemStore = defineStore('system', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      // 这个接口实际上是一个自定义的接口，可能需要根据后端实际情况调整
-      // 这里暂时使用模拟数据，因为后端可能没有这个接口
-      // 实际项目中可以调用多个接口组合数据
-      
-      // 可以获取系统状态信息
-      const status = await getSystemStatus();
-      
-      // 假设这是API的返回数据结构
-      const mockData = {
-        employee_count: status.total_employees || 0,
-        total_salary: 850000,
-        attendance_issues: 8,
-        pending_approvals: 5,
-        department_data: [
-          { name: '研发部', value: 40 },
-          { name: '市场部', value: 25 },
-          { name: '销售部', value: 30 },
-          { name: '行政部', value: 15 },
-          { name: '财务部', value: 10 },
-          { name: '人力资源部', value: 6 }
-        ],
-        salary_data: {
-          months: ['1月', '2月', '3月', '4月', '5月', '6月'],
-          basic: [320000, 320000, 320000, 320000, 320000, 320000],
-          performance: [120000, 132000, 101000, 134000, 150000, 130000],
-          bonus: [80000, 60000, 90000, 70000, 80000, 100000],
-          allowance: [50000, 50000, 50000, 50000, 50000, 50000]
-        }
-      };
-      
-      return mockData;
+      // 调用后端API获取系统概览数据
+      const response = await get('/api/v1/system/overview');
+      return response;
     } catch (err: any) {
       error.value = err.message || '获取系统概览数据失败';
+      console.error('获取系统概览数据失败:', err);
       throw err;
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  // 系统健康检查（无需认证）
+  async function checkSystemHealth() {
+    try {
+      // 直接使用axios避免token验证
+      const response = await get('/api/v1/system/health');
+      return {
+        isOnline: true,
+        data: response
+      };
+    } catch (err: any) {
+      console.error('系统健康检查失败:', err);
+      return {
+        isOnline: false,
+        error: err.message || '系统不可用'
+      };
     }
   }
 
@@ -229,6 +220,7 @@ export const useSystemStore = defineStore('system', () => {
     deleteSystemParameter,
     getOperationLogs,
     getSystemStatus,
-    getSystemOverview
+    getSystemOverview,
+    checkSystemHealth
   };
 }); 

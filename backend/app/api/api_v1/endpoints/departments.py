@@ -71,6 +71,14 @@ def create_department(
     """
     创建新部门（需要HR或管理员权限）
     """
+    # 先检查数据库中是否存在该用户ID
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前用户ID在数据库中不存在"
+        )
+    
     department = Department(
         name=department_in.name,
         description=department_in.description
@@ -79,13 +87,17 @@ def create_department(
     db.commit()
     db.refresh(department)
     
-    # 记录操作日志
-    log_operation(
-        db=db,
-        user_id=current_user.id,
-        operation_type="创建部门",
-        operation_content=f"创建了部门: {department.name}"
-    )
+    try:
+        # 记录操作日志
+        log_operation(
+            db=db,
+            user_id=current_user.id,
+            operation_type="创建部门",
+            operation_content=f"创建了部门: {department.name}"
+        )
+    except Exception as e:
+        # 如果记录日志失败，记录错误但不影响部门创建
+        print(f"记录操作日志失败: {str(e)}")
     
     return department
 
@@ -118,6 +130,14 @@ def update_department(
     """
     更新部门信息（需要HR或管理员权限）
     """
+    # 先检查数据库中是否存在该用户ID
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前用户ID在数据库中不存在"
+        )
+    
     department = db.query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(
@@ -132,13 +152,17 @@ def update_department(
     db.commit()
     db.refresh(department)
     
-    # 记录操作日志
-    log_operation(
-        db=db,
-        user_id=current_user.id,
-        operation_type="更新部门",
-        operation_content=f"更新了部门: {department.name}"
-    )
+    try:
+        # 记录操作日志
+        log_operation(
+            db=db,
+            user_id=current_user.id,
+            operation_type="更新部门",
+            operation_content=f"更新了部门: {department.name}"
+        )
+    except Exception as e:
+        # 如果记录日志失败，记录错误但不影响部门更新
+        print(f"记录操作日志失败: {str(e)}")
     
     return department
 
@@ -168,16 +192,32 @@ def delete_department(
             detail="部门下有员工，无法删除"
         )
     
-    # 记录操作日志
-    log_operation(
-        db=db,
-        user_id=current_user.id,
-        operation_type="删除部门",
-        operation_detail=f"删除了部门: {department.name}, ID: {department.id}"
-    )
+    # 检查当前用户ID是否存在
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前用户ID在数据库中不存在"
+        )
+    
+    # 保存部门信息以便记录日志
+    department_name = department.name
+    department_id_value = department.id
     
     # 删除部门
     db.delete(department)
     db.commit()
+    
+    try:
+        # 记录操作日志
+        log_operation(
+            db=db,
+            user_id=current_user.id,
+            operation_type="删除部门",
+            operation_detail=f"删除了部门: {department_name}, ID: {department_id_value}"
+        )
+    except Exception as e:
+        # 如果记录日志失败，记录错误但不影响部门删除
+        print(f"记录操作日志失败: {str(e)}")
     
     return None 

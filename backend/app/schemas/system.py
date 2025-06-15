@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -61,4 +61,26 @@ class SystemStatusResponse(BaseModel):
     db_status: str
     total_users: int
     total_employees: int
-    version: str 
+    version: str
+
+# 部门数据项
+class DepartmentDataItem(BaseModel):
+    name: str
+    value: int
+
+# 薪资数据
+class SalaryData(BaseModel):
+    months: List[str]
+    basic: List[float]
+    performance: List[float]
+    bonus: List[float]
+    allowance: List[float]
+
+# 系统概览响应模型
+class SystemOverviewResponse(BaseModel):
+    employee_count: int
+    total_salary: float
+    attendance_issues: int
+    pending_approvals: int
+    department_data: List[DepartmentDataItem]
+    salary_data: SalaryData 

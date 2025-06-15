@@ -75,4 +75,51 @@ class EmployeeDetailResponse(BaseModel):
     updated_at: datetime
 
     class Config:
-        orm_mode = True 
+        orm_mode = True
+
+# 员工搜索响应模式 - 包含前端需要的部门名称和职位名称
+class EmployeeSearchResponse(BaseModel):
+    id: int
+    employee_id: str
+    name: str
+    department_id: int
+    department_name: str
+    position_id: int
+    position_name: str
+    base_salary: float
+    hire_date: date
+    status: bool
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+        
+    @validator('employee_id', pre=True, always=True)
+    def set_employee_id(cls, v, values):
+        """确保employee_id有值，如果没有就使用id作为员工工号"""
+        if v:
+            return v
+        return str(values.get('id', ''))
+        
+    @validator('department_name', pre=True, always=True)
+    def extract_department_name(cls, v, values):
+        """从department对象中提取部门名称"""
+        if v:
+            return v
+        department = values.get('department')
+        if department and hasattr(department, 'name'):
+            return department.name
+        return ""
+        
+    @validator('position_name', pre=True, always=True)
+    def extract_position_name(cls, v, values):
+        """从position对象中提取职位名称"""
+        if v:
+            return v
+        position = values.get('position')
+        if position and hasattr(position, 'name'):
+            return position.name
+        return "" 

@@ -135,7 +135,7 @@ const searchForm = reactive({
 
 // 部门选项
 const departmentOptions = computed(() => {
-  return departmentsStore.departments.map(dept => ({
+  return (departmentsStore.departments || []).map(dept => ({
     value: dept.id,
     label: dept.name
   }))
@@ -143,24 +143,42 @@ const departmentOptions = computed(() => {
 
 // 职位选项
 const positionOptions = computed(() => {
-  return positionsStore.positions.map(pos => ({
-    value: pos.id,
-    label: pos.name
-  }))
+  // 如果没有选择部门，显示所有职位
+  if (!searchForm.department_id) {
+    return (positionsStore.positions || []).map(pos => ({
+      value: pos.id,
+      label: pos.name
+    }))
+  }
+  
+  // 根据所选部门筛选职位
+  return (positionsStore.positions || [])
+    .filter(pos => pos.department_id === parseInt(searchForm.department_id))
+    .map(pos => ({
+      value: pos.id,
+      label: pos.name
+    }))
+})
+
+// 监听部门变化，重置职位选择
+watch(() => searchForm.department_id, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    searchForm.position_id = ''
+  }
 })
 
 // 表格数据
 const tableData = computed(() => {
-  return employeesStore.employees.map(emp => ({
+  return (employeesStore.employees || []).map(emp => ({
     id: emp.id,
     employeeId: emp.id.toString().padStart(4, '0'),
     name: emp.name,
     departmentName: emp.department?.name || '-',
     positionName: emp.position?.name || '-',
-    baseSalary: emp.basic_salary,
-    hireDate: emp.entry_date,
+    baseSalary: emp.base_salary,
+    hireDate: emp.hire_date,
     phone: emp.phone,
-    status: emp.status === 'active' ? 1 : 0
+    status: emp.status ? 1 : 0
   }))
 })
 
@@ -181,7 +199,7 @@ const fetchData = () => {
   
   // 添加搜索条件
   if (searchForm.keyword) {
-    params.keyword = searchForm.keyword
+    params.name = searchForm.keyword // 注意: 后端可能使用name字段而不是keyword
   }
   
   if (searchForm.department_id) {
@@ -193,18 +211,27 @@ const fetchData = () => {
   }
   
   if (searchForm.status) {
-    params.status = searchForm.status
+    params.status = searchForm.status === 'active'
   }
   
   // 入职日期范围
   if (searchForm.hireDateRange && searchForm.hireDateRange.length === 2) {
     const [start, end] = searchForm.hireDateRange
     if (start && end) {
-      params.entry_date_start = start.toISOString().split('T')[0]
-      params.entry_date_end = end.toISOString().split('T')[0]
+      // 安全地转换日期
+      const formatDate = (date: any) => {
+        if (date && typeof date.toISOString === 'function') {
+          return date.toISOString().split('T')[0]
+        }
+        return undefined
+      }
+      
+      params.hire_date_start = formatDate(start)
+      params.hire_date_end = formatDate(end)
     }
   }
   
+  console.log('请求参数:', params) // 调试用，可以观察请求参数
   employeesStore.getEmployees(params)
 }
 
@@ -238,6 +265,9 @@ const handleCurrentChange = (val: number) => {
 
 // 格式化货币
 const formatCurrency = (value: number) => {
+  if (value === undefined || value === null) {
+    return '¥0.00'
+  }
   return `¥${value.toFixed(2)}`
 }
 
@@ -299,8 +329,16 @@ const handleExport = async () => {
     if (searchForm.hireDateRange && searchForm.hireDateRange.length === 2) {
       const [start, end] = searchForm.hireDateRange
       if (start && end) {
-        params.entry_date_start = start.toISOString().split('T')[0]
-        params.entry_date_end = end.toISOString().split('T')[0]
+        // 安全地转换日期
+        const formatDate = (date: any) => {
+          if (date && typeof date.toISOString === 'function') {
+            return date.toISOString().split('T')[0]
+          }
+          return undefined
+        }
+        
+        params.hire_date_start = formatDate(start)
+        params.hire_date_end = formatDate(end)
       }
     }
     
@@ -322,17 +360,22 @@ const handleExport = async () => {
 }
 
 // 查看员工
-const handleView = (row) => {
+const handleView = (row: any) => {
   router.push(`/employee/view/${row.id}`)
 }
 
-// 编辑员工
-const handleEdit = (row) => {
-  router.push(`/employee/edit/${row.id}`)
-}
+// 处理编辑
+const handleEdit = (row: any) => {
+  router.push(`/employee/edit/${row.id}`);
+};
+
+// 处理工资明细
+const handleSalary = (row: any) => {
+  router.push(`/employee/salary/${row.id}`);
+};
 
 // 删除员工
-const handleDelete = (row) => {
+const handleDelete = (row: any) => {
   ElMessageBox.confirm(
     `确定要删除员工 ${row.name} 吗？`,
     '删除确认',
@@ -352,11 +395,6 @@ const handleDelete = (row) => {
   }).catch(() => {
     // 取消操作
   })
-}
-
-// 工资详情
-const handleSalary = (row) => {
-  router.push(`/salary/employee/${row.id}`)
 }
 
 // 初始化

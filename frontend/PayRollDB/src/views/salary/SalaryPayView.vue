@@ -19,7 +19,7 @@
           />
         </el-form-item>
         <el-form-item label="部门">
-          <el-select v-model="filterForm.departmentId" placeholder="请选择部门" clearable>
+          <el-select v-model="filterForm.departmentId" placeholder="请选择部门" clearable @change="$forceUpdate()" class="custom-select">
             <el-option
               v-for="item in departmentOptions"
               :key="item.value"
@@ -122,15 +122,19 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Search } from '@element-plus/icons-vue'
+import { useSalariesStore, type SalaryRecord } from '@/stores/salaries'
+import { useDepartmentsStore } from '@/stores/departments'
+
+const salariesStore = useSalariesStore()
+const departmentsStore = useDepartmentsStore()
 
 // 部门选项
-const departmentOptions = ref([
-  { value: '1', label: '研发部' },
-  { value: '2', label: '市场部' },
-  { value: '3', label: '销售部' },
-  { value: '4', label: '财务部' },
-  { value: '5', label: '人事部' }
-])
+const departmentOptions = computed(() => {
+  return departmentsStore.departments.map(dept => ({
+    value: dept.id,
+    label: dept.name
+  }))
+})
 
 // 筛选表单
 const filterForm = reactive({
@@ -139,68 +143,50 @@ const filterForm = reactive({
 })
 
 // 表格数据
-const tableData = ref([])
+const tableData = computed<SalaryRecord[]>(() => {
+  return salariesStore.salaryRecords.filter(record => record.status === 'pending')
+})
 
 // 选中的行
-const selectedRows = ref([])
+const selectedRows = ref<SalaryRecord[]>([])
 
 // 加载状态
-const loading = ref(false)
+const loading = computed(() => salariesStore.isLoading)
 
 // 处理选择变更
-const handleSelectionChange = (rows) => {
+const handleSelectionChange = (rows: SalaryRecord[]) => {
   selectedRows.value = rows
 }
 
-// 模拟获取数据
-const fetchData = () => {
-  loading.value = true
+// 获取薪资数据
+const fetchData = async () => {
+  const [year, month] = filterForm.yearMonth.split('-')
   
-  setTimeout(() => {
-    // 模拟API返回数据
-    const mockData = []
-    const [year, month] = filterForm.yearMonth.split('-')
-    
-    for (let i = 0; i < 10; i++) {
-      const baseSalary = Math.floor(Math.random() * 12000) + 8000
-      const bonus = Math.floor(Math.random() * 4000)
-      const deduction = Math.floor(Math.random() * 1000)
-      const netSalary = baseSalary + bonus - deduction
-      
-      mockData.push({
-        id: i + 1,
-        employeeId: `EMP${1000 + i}`,
-        employeeName: ['张三', '李四', '王五', '赵六', '钱七'][i % 5],
-        departmentName: ['研发部', '市场部', '销售部', '财务部', '人事部'][i % 5],
-        departmentId: (i % 5 + 1).toString(),
-        bankName: ['中国银行', '工商银行', '建设银行', '农业银行', '招商银行'][i % 5],
-        bankAccount: `622202${Math.floor(10000000000000 + Math.random() * 90000000000000)}`,
-        baseSalary,
-        bonus,
-        deduction,
-        netSalary,
-        status: i % 3 === 0 ? 'pending' : 'paid'
-      })
+  try {
+    // 构建查询参数
+    const params = {
+      year: Number(year),
+      month: Number(month),
+      department_id: filterForm.departmentId ? Number(filterForm.departmentId) : undefined,
+      status: 'pending' // 只获取待发放的薪资记录
     }
     
-    // 根据部门筛选
-    if (filterForm.departmentId) {
-      tableData.value = mockData.filter(item => item.departmentId === filterForm.departmentId)
-    } else {
-      tableData.value = mockData
-    }
-    
-    loading.value = false
-  }, 500)
+    // 调用store方法获取数据
+    await salariesStore.getSalaryRecordsForDisplay(params)
+  } catch (error) {
+    console.error('获取薪资数据失败:', error)
+    ElMessage.error('获取薪资数据失败')
+  }
 }
 
 // 格式化货币
-const formatCurrency = (value) => {
+const formatCurrency = (value: number | undefined | null): string => {
+  if (value === undefined || value === null) return '¥0.00'
   return `¥${Number(value).toFixed(2)}`
 }
 
 // 掩码银行账号
-const maskBankAccount = (account) => {
+const maskBankAccount = (account: string | undefined): string => {
   if (!account) return ''
   return account.replace(/^(\d{6})(\d+)(\d{4})$/, '$1****$3')
 }
@@ -211,7 +197,7 @@ const handleFilter = () => {
 }
 
 // 处理单个发放
-const handlePay = (row) => {
+const handlePay = (row: SalaryRecord) => {
   ElMessageBox.confirm(
     `确定要向 ${row.employeeName} 发放工资 ${formatCurrency(row.netSalary)} 吗？`,
     '工资发放确认',
@@ -220,11 +206,17 @@ const handlePay = (row) => {
       cancelButtonText: '取消',
       type: 'warning',
     }
-  ).then(() => {
-    // 实际项目中应该调用API
-    row.status = 'paid'
-    ElMessage.success(`已成功向 ${row.employeeName} 发放工资`)
-    updatePaymentSummary()
+  ).then(async () => {
+    try {
+      await salariesStore.paySalary(row.id)
+      ElMessage.success(`已成功向 ${row.employeeName} 发放工资`)
+      updatePaymentSummary()
+      // 重新获取待发放数据
+      fetchData()
+    } catch (error) {
+      console.error('发放工资失败:', error)
+      ElMessage.error('发放工资失败')
+    }
   }).catch(() => {
     ElMessage.info('已取消发放')
   })
@@ -249,19 +241,21 @@ const handlePayAll = () => {
       cancelButtonText: '取消',
       type: 'warning',
     }
-  ).then(() => {
-    loading.value = true
-    
-    // 实际项目中应该调用API
-    setTimeout(() => {
-      pendingRows.forEach(row => {
-        row.status = 'paid'
-      })
+  ).then(async () => {
+    try {
+      // 调用批量发放API
+      const recordIds = pendingRows.map(row => row.id)
+      await salariesStore.batchPaySalaries(recordIds)
       
-      loading.value = false
       ElMessage.success(`已成功向 ${pendingRows.length} 名员工发放工资`)
+      // 更新摘要信息
       updatePaymentSummary()
-    }, 1000)
+      // 重新获取待发放数据
+      fetchData()
+    } catch (error) {
+      console.error('批量发放工资失败:', error)
+      ElMessage.error('批量发放工资失败')
+    }
   }).catch(() => {
     ElMessage.info('已取消发放')
   })
@@ -272,7 +266,7 @@ const paymentSummary = reactive({
   yearMonth: '',
   employeeCount: 0,
   totalAmount: 0,
-  status: 'pending'
+  status: 'pending' as 'pending' | 'paid'
 })
 
 // 更新薪资发放摘要
@@ -283,13 +277,27 @@ const updatePaymentSummary = () => {
   paymentSummary.totalAmount = tableData.value.reduce((sum, row) => sum + row.netSalary, 0)
   
   // 如果所有记录都已发放，则状态为已发放
-  const allPaid = tableData.value.every(row => row.status === 'paid')
-  paymentSummary.status = allPaid ? 'paid' : 'pending'
+  const pendingCount = salariesStore.salaryRecords.filter(row => 
+    row.status === 'pending' && 
+    row.year === Number(year) && 
+    row.month === Number(month)
+  ).length
+  
+  paymentSummary.status = pendingCount === 0 ? 'paid' : 'pending'
 }
 
-onMounted(() => {
-  fetchData()
-  updatePaymentSummary()
+// 初始化
+onMounted(async () => {
+  try {
+    // 获取部门数据
+    await departmentsStore.getDepartments()
+    // 获取薪资数据
+    await fetchData()
+    // 更新薪资发放摘要
+    updatePaymentSummary()
+  } catch (error) {
+    console.error('初始化数据失败:', error)
+  }
 })
 </script>
 
@@ -319,6 +327,23 @@ onMounted(() => {
     padding: 20px;
     border-radius: 4px;
     box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.04);
+    
+    .custom-select {
+      min-width: 120px;
+      width: 100%;
+    }
+    
+    :deep(.el-select) {
+      width: 120px;
+    }
+    
+    :deep(.el-select .el-input__wrapper) {
+      width: 100%;
+    }
+    
+    :deep(.el-select .el-input__inner) {
+      width: 100%;
+    }
   }
   
   .summary-card {

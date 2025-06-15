@@ -43,6 +43,49 @@ class CRUDEmployee(CRUDBase[Employee, EmployeeCreate, EmployeeUpdate]):
         
         return query.offset(skip).limit(limit).all()
     
+    def search_employees(
+        self,
+        db: Session,
+        *,
+        keyword: Optional[str] = None,
+        department_id: Optional[int] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Employee]:
+        """
+        搜索员工，支持关键词搜索和部门筛选
+        
+        如果提供了关键词，将搜索员工姓名、工号、职位名称匹配的员工
+        如果提供了部门ID，将只返回该部门的员工
+        如果同时提供了关键词和部门ID，将返回该部门中匹配关键词的员工
+        """
+        query = db.query(self.model)
+        
+        # 应用部门筛选
+        if department_id is not None:
+            query = query.filter(self.model.department_id == department_id)
+        
+        # 应用关键词搜索
+        if keyword:
+            # 使用or_()组合多个搜索条件
+            query = query.filter(
+                or_(
+                    self.model.name.ilike(f"%{keyword}%"),  # 姓名匹配
+                    self.model.employee_id.ilike(f"%{keyword}%"),  # 工号匹配
+                    # 其他可能的匹配字段，如电话、邮箱等
+                    self.model.phone.ilike(f"%{keyword}%"),
+                    self.model.email.ilike(f"%{keyword}%") if self.model.email else False
+                )
+            )
+        
+        # 默认只返回在职员工
+        query = query.filter(self.model.status == True)
+        
+        # 加载关联的部门和职位信息以便返回详细信息
+        query = query.join(self.model.department).join(self.model.position)
+        
+        return query.offset(skip).limit(limit).all()
+    
     def get_with_relations(self, db: Session, id: int) -> Optional[Employee]:
         """
         获取员工详情，包括关联的部门和职位信息

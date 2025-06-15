@@ -27,4 +27,5 @@ class Employee(Base):
     user = relationship("User", back_populates="employee", uselist=False, primaryjoin="Employee.id == User.employee_id")
     attendances = relationship("Attendance", back_populates="employee")
     salary_records = relationship("SalaryRecord", back_populates="employee")
-    social_security = relationship("EmployeeSocialSecurity", back_populates="employee") 
+    social_security = relationship("EmployeeSocialSecurity", back_populates="employee")
+    salary_configs = relationship("EmployeeSalaryConfig", back_populates="employee") 

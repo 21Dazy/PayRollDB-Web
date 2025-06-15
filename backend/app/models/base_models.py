@@ -15,6 +15,7 @@ class Department(Base):
 class Position(Base):
     """职位模型"""
     name = Column(String(50), nullable=False, comment='职位名称')
+    department_id = Column(Integer, ForeignKey('departments.id'), nullable=False, index=True, comment='所属部门ID')
     description = Column(String(255), comment='职位描述')
 
 # 员工模型

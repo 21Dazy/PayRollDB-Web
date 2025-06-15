@@ -1,0 +1,57 @@
+/* 修复Element Plus组件样式问题 */
+
+/* 修复选择框组件显示问题 */
+.el-select {
+  min-width: 120px !important;
+}
+
+.el-select .el-input {
+  min-width: 120px !important;
+  width: 100% !important;
+}
+
+.el-select .el-input__wrapper {
+  min-width: 120px !important;
+  width: 100% !important;
+}
+
+.el-select .el-input__inner {
+  min-width: 120px !important;
+  width: 100% !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.el-select .el-select__tags {
+  max-width: 90% !important;
+}
+
+.el-select-dropdown__item {
+  padding-right: 20px !important;
+}
+
+/* 确保下拉选项可见 */
+.el-select-dropdown {
+  min-width: 120px !important;
+}
+
+/* 确保选择框内容显示完整 */
+.el-select__popper {
+  min-width: 120px !important;
+}
+
+/* 确保选择框内容在移动端也能正常显示 */
+@media screen and (max-width: 768px) {
+  .el-select {
+    min-width: 100px !important;
+    width: 100% !important;
+  }
+  
+  .el-select .el-input,
+  .el-select .el-input__wrapper,
+  .el-select .el-input__inner {
+    min-width: 100px !important;
+    width: 100% !important;
+  }
+} 

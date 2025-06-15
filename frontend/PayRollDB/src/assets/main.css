@@ -23,3 +23,24 @@ a,
 }
 
 /* 移除了限制布局的媒体查询 */
+
+/* 修复选择框组件显示问题 */
+.el-select {
+  min-width: 120px !important;
+}
+
+.el-select .el-input__wrapper {
+  width: 100% !important;
+}
+
+.el-select .el-input__inner {
+  width: 100% !important;
+}
+
+.el-select .el-select__tags {
+  max-width: 90% !important;
+}
+
+.el-select-dropdown__item {
+  padding-right: 20px !important;
+}
