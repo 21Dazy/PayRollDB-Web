@@ -31,9 +31,17 @@ export interface SalaryRecord {
   departmentName: string;
   positionName?: string;
   baseSalary: number;
+  overtimePay: number;
   bonus: number;
+  performanceBonus: number;
+  attendanceBonus: number;
+  transportationAllowance: number;
+  mealAllowance: number;
   deduction: number;
   socialSecurity: number;
+  lateDeduction: number;
+  absenceDeduction: number;
+  personalTax: number;
   netSalary: number;
   status: 'pending' | 'paid';
   paymentDate: string | null;
@@ -74,10 +82,42 @@ export const useSalariesStore = defineStore('salaries', () => {
       const response = await get('/api/v1/salaries/records', params)
       
       if (Array.isArray(response)) {
-        salaryRecords.value = response
+        // 确保所有数值字段都有默认值
+        salaryRecords.value = response.map((record: any) => ({
+          ...record,
+          baseSalary: record.baseSalary || 0,
+          overtimePay: record.overtimePay || 0,
+          bonus: record.bonus || 0,
+          performanceBonus: record.performanceBonus || 0,
+          attendanceBonus: record.attendanceBonus || 0,
+          transportationAllowance: record.transportationAllowance || 0,
+          mealAllowance: record.mealAllowance || 0,
+          deduction: record.deduction || 0,
+          lateDeduction: record.lateDeduction || 0,
+          absenceDeduction: record.absenceDeduction || 0,
+          socialSecurity: record.socialSecurity || 0,
+          personalTax: record.personalTax || 0,
+          netSalary: record.netSalary || 0
+        }))
         totalCount.value = response.length
       } else if (response && response.items) {
-        salaryRecords.value = response.items
+        // 确保所有数值字段都有默认值
+        salaryRecords.value = response.items.map((record: any) => ({
+          ...record,
+          baseSalary: record.baseSalary || 0,
+          overtimePay: record.overtimePay || 0,
+          bonus: record.bonus || 0,
+          performanceBonus: record.performanceBonus || 0,
+          attendanceBonus: record.attendanceBonus || 0,
+          transportationAllowance: record.transportationAllowance || 0,
+          mealAllowance: record.mealAllowance || 0,
+          deduction: record.deduction || 0,
+          lateDeduction: record.lateDeduction || 0,
+          absenceDeduction: record.absenceDeduction || 0,
+          socialSecurity: record.socialSecurity || 0,
+          personalTax: record.personalTax || 0,
+          netSalary: record.netSalary || 0
+        }))
         totalCount.value = response.total || response.items.length
       } else {
         console.error('无效的薪资数据格式:', response)

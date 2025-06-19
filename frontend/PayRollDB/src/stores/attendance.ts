@@ -20,9 +20,9 @@ interface Attendance {
 interface AttendanceStatus {
   id: number;
   name: string;
-  code: string;
   description?: string;
-  is_paid: boolean;
+  is_deduction: boolean;
+  deduction_value: number;
   created_at: string;
   updated_at?: string;
 }
@@ -31,7 +31,6 @@ interface AttendanceCreateUpdate {
   employee_id: number;
   date: string;
   status_id: number;
-  work_hours?: number;
   overtime_hours?: number;
   remarks?: string;
 }
@@ -60,8 +59,8 @@ export const useAttendanceStore = defineStore('attendance', () => {
     error.value = null;
     try {
       const response: any = await get('/api/v1/attendance/', { params });
-      attendances.value = response.items;
-      totalCount.value = response.total;
+      attendances.value = response.items || response;
+      totalCount.value = response.total || response.length;
       return response;
     } catch (err: any) {
       error.value = err.message || '获取考勤列表失败';
@@ -157,7 +156,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await get('/api/v1/attendance/statuses');
+      const response = await get('/api/v1/attendance/status');
       attendanceStatuses.value = response;
       return response;
     } catch (err: any) {

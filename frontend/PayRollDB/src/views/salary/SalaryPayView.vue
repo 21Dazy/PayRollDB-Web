@@ -78,14 +78,59 @@
             {{ formatCurrency(row.baseSalary) }}
           </template>
         </el-table-column>
+        <el-table-column prop="overtimePay" label="加班费" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.overtimePay) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="bonus" label="奖金" width="100">
           <template #default="{ row }">
             {{ formatCurrency(row.bonus) }}
           </template>
         </el-table-column>
+        <el-table-column prop="performanceBonus" label="绩效奖金" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.performanceBonus) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="attendanceBonus" label="全勤奖" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.attendanceBonus) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="transportationAllowance" label="交通补贴" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.transportationAllowance) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="mealAllowance" label="餐补" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.mealAllowance) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="deduction" label="扣款" width="100">
           <template #default="{ row }">
             {{ formatCurrency(row.deduction) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="lateDeduction" label="迟到扣款" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.lateDeduction) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="absenceDeduction" label="缺勤扣款" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.absenceDeduction) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="socialSecurity" label="社保公积金" width="120">
+          <template #default="{ row }">
+            {{ formatCurrency(row.socialSecurity) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="personalTax" label="个税" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.personalTax) }}
           </template>
         </el-table-column>
         <el-table-column prop="netSalary" label="实发工资" width="120">
@@ -231,7 +276,11 @@ const handlePayAll = () => {
     return
   }
   
-  const totalAmount = pendingRows.reduce((sum, row) => sum + row.netSalary, 0)
+  // 计算总金额时确保处理undefined的情况
+  const totalAmount = pendingRows.reduce((sum, row) => {
+    const netSalary = row.netSalary || 0;
+    return sum + netSalary;
+  }, 0)
   
   ElMessageBox.confirm(
     `确定要向 ${pendingRows.length} 名员工发放工资，总计 ${formatCurrency(totalAmount)} 吗？`,
@@ -274,7 +323,12 @@ const updatePaymentSummary = () => {
   const [year, month] = filterForm.yearMonth.split('-')
   paymentSummary.yearMonth = `${year}年${month}月`
   paymentSummary.employeeCount = tableData.value.length
-  paymentSummary.totalAmount = tableData.value.reduce((sum, row) => sum + row.netSalary, 0)
+  
+  // 计算总金额时确保处理undefined的情况
+  paymentSummary.totalAmount = tableData.value.reduce((sum, row) => {
+    const netSalary = row.netSalary || 0;
+    return sum + netSalary;
+  }, 0)
   
   // 如果所有记录都已发放，则状态为已发放
   const pendingCount = salariesStore.salaryRecords.filter(row => 

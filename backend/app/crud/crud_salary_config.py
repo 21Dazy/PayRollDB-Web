@@ -30,49 +30,53 @@ class CRUDSalaryConfig(CRUDBase[EmployeeSalaryConfig, SalaryConfigItemCreate, Sa
         for config in all_configs:
             print(f"配置ID: {config.id}, 项目ID: {config.item_id}, 值: {config.value}, 是否激活: {config.is_active}, 生效日期: {config.effective_date}, 失效日期: {config.expiry_date}")
         
-        # 修改查询逻辑，忽略is_active字段，只根据日期判断有效性
-        query = db.query(EmployeeSalaryConfig).filter(
-            EmployeeSalaryConfig.employee_id == employee_id
-        ).options(joinedload(EmployeeSalaryConfig.salary_item))
+        # 获取所有有效的配置（不管生效日期）
+        active_configs = db.query(EmployeeSalaryConfig).filter(
+            EmployeeSalaryConfig.employee_id == employee_id,
+            EmployeeSalaryConfig.is_active == True
+        ).options(joinedload(EmployeeSalaryConfig.salary_item)).all()
         
-        if effective_date:
-            query = query.filter(
-                EmployeeSalaryConfig.effective_date <= effective_date,
-                or_(
-                    EmployeeSalaryConfig.expiry_date.is_(None),
-                    EmployeeSalaryConfig.expiry_date >= effective_date
-                )
-            )
-        else:
-            # 如果没有提供有效日期，则获取最新的配置
-            query = query.order_by(EmployeeSalaryConfig.effective_date.desc())
+        # 按项目ID分组，每个项目只保留最新的配置
+        valid_configs = {}
+        for config in active_configs:
+            # 如果没有指定有效日期，或者配置的生效日期早于等于有效日期
+            if not effective_date or config.effective_date <= effective_date:
+                # 如果该项目ID还没有配置，或者当前配置的生效日期更晚
+                if config.item_id not in valid_configs or config.effective_date > valid_configs[config.item_id].effective_date:
+                    valid_configs[config.item_id] = config
         
-        configs = query.all()
-        print(f"获取到 {len(configs)} 条有效薪资配置")
+        # 转换为列表
+        result_configs = list(valid_configs.values())
+        print(f"获取到 {len(result_configs)} 条有效薪资配置")
         
         # 检查每个配置的薪资项目
-        valid_configs = []
-        for config in configs:
-            item = db.query(SalaryItem).filter(SalaryItem.id == config.item_id).first()
+        final_configs = []
+        for config in result_configs:
+            item = config.salary_item
             if item:
                 print(f"薪资配置项: item_id={config.item_id}, value={config.value}, 项目名称={item.name}")
-                valid_configs.append(config)
+                final_configs.append(config)
             else:
                 print(f"警告: 配置项 {config.id} 引用了不存在的薪资项目 {config.item_id}")
         
-        # 如果没有找到有效配置，但有任何配置，则返回最新的配置
-        if not valid_configs and all_configs:
+        # 如果没有找到有效配置，尝试使用最新的任何配置
+        if not final_configs and all_configs:
             print("没有找到有效配置，尝试返回最新的配置")
             # 按生效日期降序排序
             all_configs.sort(key=lambda x: x.effective_date, reverse=True)
+            
+            # 按项目ID分组，每个项目只保留最新的配置
+            latest_configs = {}
             for config in all_configs:
-                item = db.query(SalaryItem).filter(SalaryItem.id == config.item_id).first()
-                if item:
-                    print(f"使用最新配置: item_id={config.item_id}, value={config.value}, 项目名称={item.name}")
-                    valid_configs.append(config)
-                    break
+                if config.item_id not in latest_configs:
+                    item = db.query(SalaryItem).filter(SalaryItem.id == config.item_id).first()
+                    if item:
+                        print(f"使用最新配置: item_id={config.item_id}, value={config.value}, 项目名称={item.name}")
+                        latest_configs[config.item_id] = config
+            
+            final_configs = list(latest_configs.values())
         
-        return valid_configs
+        return final_configs
     
     def create_employee_config(
         self,
@@ -134,13 +138,21 @@ class CRUDSalaryConfig(CRUDBase[EmployeeSalaryConfig, SalaryConfigItemCreate, Sa
             
             if existing:
                 print(f"更新现有配置: id={existing.id}, item_id={existing.item_id}")
-                # 更新现有配置
-                existing.value = item.value
-                existing.base_item = item.base_item
-                existing.effective_date = item.effective_date or date.today()
-                existing.is_active = True
+                # 将现有配置标记为非活动
+                existing.is_active = False
                 db.add(existing)
-                db_configs.append(existing)
+                
+                # 创建新配置
+                db_config = EmployeeSalaryConfig(
+                    employee_id=employee_id,
+                    item_id=item.item_id,
+                    value=item.value,
+                    base_item=item.base_item,
+                    is_active=True,
+                    effective_date=item.effective_date or date.today()
+                )
+                db.add(db_config)
+                db_configs.append(db_config)
             else:
                 print(f"创建新配置: item_id={item.item_id}")
                 # 创建新配置

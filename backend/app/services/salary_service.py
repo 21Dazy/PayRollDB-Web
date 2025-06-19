@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -30,11 +30,17 @@ class SalaryService:
         if not employee:
             raise ValueError(f"员工ID {employee_id} 不存在")
         
+        # 获取月份的最后一天作为有效日期
+        if month == 12:
+            effective_date = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            effective_date = date(year, month + 1, 1) - timedelta(days=1)
+        
         # 获取员工薪资配置
         configs = crud_salary_config.get_employee_config(
             self.db, 
             employee_id=employee_id,
-            effective_date=date(year, month, 1)
+            effective_date=effective_date
         )
         
         # 打印薪资配置，用于调试
@@ -47,8 +53,14 @@ class SalaryService:
             'base_salary': Decimal(str(employee.base_salary or '0')),  # 默认使用员工基本工资
             'overtime_pay': Decimal('0'),
             'bonus': Decimal('0'),
+            'performance_bonus': Decimal('0'),
+            'attendance_bonus': Decimal('0'),
+            'transportation_allowance': Decimal('0'),
+            'meal_allowance': Decimal('0'),
             'deduction': Decimal('0'),
             'social_security': Decimal('0'),
+            'late_deduction': Decimal('0'),
+            'absence_deduction': Decimal('0'),
             'personal_tax': Decimal('0')
         }
         
@@ -79,7 +91,7 @@ class SalaryService:
                     actual_value = value
                     print(f"固定金额: {actual_value}")
                 
-                # 根据项目类型累加到相应组成部分
+                # 根据项目类型和名称累加到相应组成部分
                 if item.type == 'addition':
                     if item.name == '基本工资':
                         print(f"设置基本工资: {actual_value}")
@@ -88,6 +100,18 @@ class SalaryService:
                     elif item.name == '加班费':
                         print(f"累加加班费: {actual_value}")
                         salary_components['overtime_pay'] += actual_value
+                    elif item.name == '绩效奖金':
+                        print(f"累加绩效奖金: {actual_value}")
+                        salary_components['performance_bonus'] += actual_value
+                    elif item.name == '全勤奖':
+                        print(f"累加全勤奖: {actual_value}")
+                        salary_components['attendance_bonus'] += actual_value
+                    elif item.name == '交通补贴':
+                        print(f"累加交通补贴: {actual_value}")
+                        salary_components['transportation_allowance'] += actual_value
+                    elif item.name == '餐补':
+                        print(f"累加餐补: {actual_value}")
+                        salary_components['meal_allowance'] += actual_value
                     else:
                         print(f"累加奖金: {actual_value}")
                         salary_components['bonus'] += actual_value
@@ -98,6 +122,12 @@ class SalaryService:
                     elif '税' in item.name:
                         print(f"累加个税: {actual_value}")
                         salary_components['personal_tax'] += actual_value
+                    elif '迟到' in item.name:
+                        print(f"累加迟到扣款: {actual_value}")
+                        salary_components['late_deduction'] += actual_value
+                    elif '缺勤' in item.name:
+                        print(f"累加缺勤扣款: {actual_value}")
+                        salary_components['absence_deduction'] += actual_value
                     else:
                         print(f"累加扣款: {actual_value}")
                         salary_components['deduction'] += actual_value
@@ -129,7 +159,7 @@ class SalaryService:
             attendance_deduction = self._calculate_attendance_deduction(
                 employee_id, year, month
             )
-            salary_components['deduction'] += attendance_deduction
+            salary_components['absence_deduction'] += attendance_deduction
         except Exception as e:
             print(f"计算考勤扣款出错: {str(e)}")
         
@@ -137,13 +167,22 @@ class SalaryService:
         net_salary = (
             salary_components['base_salary'] +
             salary_components['overtime_pay'] +
-            salary_components['bonus'] -
+            salary_components['bonus'] +
+            salary_components['performance_bonus'] +
+            salary_components['attendance_bonus'] +
+            salary_components['transportation_allowance'] +
+            salary_components['meal_allowance'] -
             salary_components['deduction'] -
             salary_components['social_security'] -
-            salary_components['personal_tax']
+            salary_components['personal_tax'] -
+            salary_components['late_deduction'] -
+            salary_components['absence_deduction']
         )
         
-        print(f"计算实发工资: {salary_components['base_salary']} + {salary_components['overtime_pay']} + {salary_components['bonus']} - {salary_components['deduction']} - {salary_components['social_security']} - {salary_components['personal_tax']} = {net_salary}")
+        print(f"计算实发工资: {salary_components['base_salary']} + {salary_components['overtime_pay']} + {salary_components['bonus']} + "
+              f"{salary_components['performance_bonus']} + {salary_components['attendance_bonus']} + {salary_components['transportation_allowance']} + "
+              f"{salary_components['meal_allowance']} - {salary_components['deduction']} - {salary_components['social_security']} - "
+              f"{salary_components['personal_tax']} - {salary_components['late_deduction']} - {salary_components['absence_deduction']} = {net_salary}")
         
         result = {
             'employee_id': employee_id,
@@ -179,25 +218,66 @@ class SalaryService:
             else:
                 end_date = date(year, month + 1, 1)
             
-            attendances = self.db.query(Attendance).filter(
+            # 联合查询考勤记录和考勤状态
+            attendances = self.db.query(Attendance).join(
+                AttendanceStatus, Attendance.status_id == AttendanceStatus.id
+            ).filter(
                 Attendance.employee_id == employee_id,
                 Attendance.date >= start_date,
                 Attendance.date < end_date
             ).all()
             
+            # 获取员工基本工资
+            employee = crud_employee.get(self.db, id=employee_id)
+            if not employee:
+                print(f"员工ID {employee_id} 不存在，无法计算考勤扣款")
+                return Decimal('0')
+            
+            base_salary = Decimal(str(employee.base_salary or '0'))
+            daily_salary = base_salary / Decimal('22')  # 假设每月22个工作日
+            
+            # 统计不同类型的考勤状态
+            late_count = 0
+            absent_count = 0
             total_deduction = Decimal('0')
             
+            print(f"开始计算员工 {employee_id} 的考勤扣款，共 {len(attendances)} 条记录")
+            
             for attendance in attendances:
-                if attendance.status and attendance.status.is_deduction:
-                    # 如果是百分比扣款，基于日工资计算
-                    if attendance.status.deduction_value < 2:  # 假设小于2的是百分比
-                        employee = crud_employee.get(self.db, id=employee_id)
-                        daily_salary = Decimal(str(employee.base_salary or '0')) / 22  # 假设每月22个工作日
-                        deduction = daily_salary * Decimal(str(attendance.status.deduction_value))
+                # 获取考勤状态
+                status = attendance.status
+                if not status:
+                    print(f"考勤记录 {attendance.id} 没有关联的状态，跳过")
+                    continue
+                
+                print(f"处理考勤记录: 日期={attendance.date}, 状态={status.name}, is_deduction={status.is_deduction}, deduction_value={status.deduction_value}")
+                
+                # 如果是扣款状态
+                if status.is_deduction:
+                    if '迟到' in status.name:
+                        late_count += 1
+                        # 迟到扣款，通常是固定金额
+                        deduction = Decimal(str(status.deduction_value))
+                        print(f"迟到扣款: {deduction}")
+                    elif '缺勤' in status.name or '旷工' in status.name:
+                        absent_count += 1
+                        # 缺勤扣款，通常是日工资的倍数
+                        if status.deduction_value <= 2:  # 如果是比例
+                            deduction = daily_salary * Decimal(str(status.deduction_value))
+                        else:  # 如果是固定金额
+                            deduction = Decimal(str(status.deduction_value))
+                        print(f"缺勤扣款: 日工资={daily_salary}, 扣款比例/金额={status.deduction_value}, 实际扣款={deduction}")
                     else:
-                        deduction = Decimal(str(attendance.status.deduction_value))
+                        # 其他扣款情况
+                        if status.deduction_value <= 2:  # 如果是比例
+                            deduction = daily_salary * Decimal(str(status.deduction_value))
+                        else:  # 如果是固定金额
+                            deduction = Decimal(str(status.deduction_value))
+                        print(f"其他扣款: {deduction}")
                     
                     total_deduction += deduction
+            
+            print(f"员工 {employee_id} 的考勤扣款统计: 迟到={late_count}次, 缺勤={absent_count}次, 总扣款={total_deduction}")
             
             return total_deduction
         except Exception as e:
@@ -252,8 +332,14 @@ class SalaryService:
                     existing.base_salary = salary_data['components']['base_salary']
                     existing.overtime_pay = salary_data['components']['overtime_pay']
                     existing.bonus = salary_data['components']['bonus']
+                    existing.performance_bonus = salary_data['components']['performance_bonus']
+                    existing.attendance_bonus = salary_data['components']['attendance_bonus']
+                    existing.transportation_allowance = salary_data['components']['transportation_allowance']
+                    existing.meal_allowance = salary_data['components']['meal_allowance']
                     existing.deduction = salary_data['components']['deduction']
                     existing.social_security = salary_data['components']['social_security']
+                    existing.late_deduction = salary_data['components']['late_deduction']
+                    existing.absence_deduction = salary_data['components']['absence_deduction']
                     existing.personal_tax = salary_data['components']['personal_tax']
                     existing.net_salary = salary_data['net_salary']
                     
@@ -270,8 +356,14 @@ class SalaryService:
                         base_salary=salary_data['components']['base_salary'],
                         overtime_pay=salary_data['components']['overtime_pay'],
                         bonus=salary_data['components']['bonus'],
+                        performance_bonus=salary_data['components']['performance_bonus'],
+                        attendance_bonus=salary_data['components']['attendance_bonus'],
+                        transportation_allowance=salary_data['components']['transportation_allowance'],
+                        meal_allowance=salary_data['components']['meal_allowance'],
                         deduction=salary_data['components']['deduction'],
                         social_security=salary_data['components']['social_security'],
+                        late_deduction=salary_data['components']['late_deduction'],
+                        absence_deduction=salary_data['components']['absence_deduction'],
                         personal_tax=salary_data['components']['personal_tax'],
                         net_salary=salary_data['net_salary'],
                         status='pending'

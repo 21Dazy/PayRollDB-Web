@@ -11,6 +11,7 @@ from app.models.employee import Employee
 from app.models.salary_item import SalaryItem
 from app.models.salary_record import SalaryRecord
 from app.models.salary_detail import SalaryDetail
+from app.models.salary_config import EmployeeSalaryConfig as DBEmployeeSalaryConfig
 from app.schemas.salary import (
     SalaryItemCreate, SalaryItemUpdate, SalaryItemResponse,
     SalaryRecordCreate, SalaryRecordUpdate, SalaryRecordResponse,
@@ -240,7 +241,13 @@ def read_salary_records(
             "baseSalary": record.base_salary,
             "overtimePay": record.overtime_pay,
             "bonus": record.bonus,
+            "performanceBonus": record.performance_bonus,
+            "attendanceBonus": record.attendance_bonus,
+            "transportationAllowance": record.transportation_allowance,
+            "mealAllowance": record.meal_allowance,
             "deduction": record.deduction,
+            "lateDeduction": record.late_deduction,
+            "absenceDeduction": record.absence_deduction,
             "socialSecurity": record.social_security,
             "personalTax": record.personal_tax,
             "netSalary": record.net_salary,
@@ -382,8 +389,14 @@ def read_salary_record(
         "base_salary": record.base_salary,
         "overtime_pay": record.overtime_pay,
         "bonus": record.bonus,
+        "performance_bonus": record.performance_bonus,
+        "attendance_bonus": record.attendance_bonus,
+        "transportation_allowance": record.transportation_allowance,
+        "meal_allowance": record.meal_allowance,
         "deduction": record.deduction,
         "social_security": record.social_security,
+        "late_deduction": record.late_deduction,
+        "absence_deduction": record.absence_deduction,
         "personal_tax": record.personal_tax,
         "net_salary": record.net_salary,
         "status": record.status,
@@ -443,6 +456,46 @@ def update_salary_record(
     )
     
     return record
+
+@router.delete("/records/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_salary_record(
+    *,
+    db: Session = Depends(get_db),
+    record_id: int,
+    current_user: User = Depends(get_current_hr_user)
+) -> None:
+    """
+    删除工资记录
+    """
+    record = db.query(SalaryRecord).filter(SalaryRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="工资记录不存在"
+        )
+    
+    # 如果已发放，不允许删除
+    if record.status == "paid":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已发放的工资记录不允许删除"
+        )
+    
+    employee_id = record.employee_id
+    year = record.year
+    month = record.month
+    
+    db.delete(record)
+    db.commit()
+    
+    log_operation(
+        db=db,
+        user_id=current_user.id,
+        operation_type="删除工资记录",
+        operation_detail=f"删除了员工 ID: {employee_id} 的 {year}年{month}月 工资记录"
+    )
+    
+    return None
 
 @router.post("/pay", response_model=SalaryPaymentResponse)
 def pay_salaries(
@@ -580,7 +633,7 @@ def get_employee_salary_config(
         if base_salary_item and employee.base_salary:
             print(f"添加默认基本工资配置: {employee.base_salary}")
             # 创建默认配置
-            default_config = EmployeeSalaryConfig(
+            default_config = DBEmployeeSalaryConfig(
                 employee_id=employee_id,
                 item_id=base_salary_item.id,
                 value=employee.base_salary,
@@ -605,6 +658,9 @@ def get_employee_salary_config(
                 is_percentage=base_salary_item.is_percentage,
                 is_system=base_salary_item.is_system
             ))
+        else:
+            # 即使没有基本工资配置，也要返回空的items列表
+            print(f"无法添加默认基本工资配置: 基本工资项目不存在或员工没有设置基本工资")
     
     return EmployeeSalaryConfig(employee_id=employee_id, items=items)
 

@@ -249,15 +249,15 @@ const { proxy } = getCurrentInstance() || { proxy: null };
 
 // 状态变量
 const employeesLoading = ref(false);
-const currentEmployee = ref(null);
-const employeeSalaryItems = ref([]);
-const employeeSearchResults = ref([]);
+const currentEmployee = ref<any>(null);
+const employeeSalaryItems = ref<any[]>([]);
+const employeeSearchResults = ref<any[]>([]);
 const dialogVisible = ref(false);
 const isEdit = ref(false);
 const submitting = ref(false);
 const saving = ref(false);
 const formRef = ref<FormInstance | null>(null);
-const currentItemId = ref(null);
+const currentItemId = ref<number | null>(null);
 
 // 部门选项
 const departmentOptions = computed(() => {
@@ -342,7 +342,7 @@ const netSalary = computed(() => {
 });
 
 // 格式化货币
-const formatCurrency = (value) => {
+const formatCurrency = (value: number | null | undefined) => {
   if (value === undefined || value === null) return '¥0.00';
   return `¥${Number(value).toFixed(2)}`;
 };
@@ -365,18 +365,23 @@ const maskBankAccount = (account) => {
 };
 
 // 计算薪资项目金额
-const calculateItemAmount = (item) => {
+const calculateItemAmount = (item: any) => {
   if (!currentEmployee.value) return 0;
   
-  if (item.is_percentage) {
-    // 百分比计算
-    const baseValue = item.base_item === 'base_salary' 
-      ? currentEmployee.value.base_salary 
-      : 0;
-    return baseValue * (item.value / 100);
-  } else {
-    // 固定金额
-    return item.value;
+  try {
+    if (item.is_percentage) {
+      // 百分比计算
+      const baseValue = item.base_item === 'base_salary' 
+        ? (currentEmployee.value.base_salary || 0)
+        : 0;
+      return parseFloat((baseValue * (item.value / 100)).toFixed(2));
+    } else {
+      // 固定金额
+      return parseFloat(item.value);
+    }
+  } catch (error) {
+    console.error('计算薪资项目金额出错:', error);
+    return 0;
   }
 };
 
@@ -601,21 +606,25 @@ const handleSaveConfig = async () => {
   
   saving.value = true;
   try {
-    // 准备要保存的数据，确保包含effective_date
-    const configItems = employeeSalaryItems.value.map(item => ({
-      item_id: item.item_id,
-      value: item.value,
-      base_item: item.base_item,
-      is_active: true,
-      effective_date: new Date().toISOString().split('T')[0] // 当前日期
-    }));
+    // 获取当前日期，并设置为当月第一天
+    const now = new Date();
+    const effectiveDate = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    await salaryConfigStore.saveEmployeeSalaryConfig(currentEmployee.value.id, {
-      items: configItems
-    });
+    // 准备要保存的数据，使用当月第一天作为生效日期
+    const configData = {
+      employee_id: currentEmployee.value.id,
+      items: employeeSalaryItems.value.map(item => ({
+        item_id: item.item_id,
+        value: item.value,
+        base_item: item.base_item || null,
+        effective_date: effectiveDate.toISOString().split('T')[0]
+      }))
+    };
+    
+    await salaryConfigStore.saveEmployeeSalaryConfig(currentEmployee.value.id, configData);
     
     ElMessage.success('薪资配置保存成功');
-  } catch (error) {
+  } catch (error: any) {
     console.error('保存薪资配置失败:', error);
     ElMessage.error('保存薪资配置失败');
   } finally {

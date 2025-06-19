@@ -85,9 +85,39 @@
             {{ formatCurrency(row.bonus) }}
           </template>
         </el-table-column>
+        <el-table-column prop="performanceBonus" label="绩效奖金" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.performanceBonus) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="attendanceBonus" label="全勤奖" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.attendanceBonus) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="transportationAllowance" label="交通补贴" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.transportationAllowance) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="mealAllowance" label="餐补" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.mealAllowance) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="deduction" label="扣款" width="100">
           <template #default="{ row }">
             {{ formatCurrency(row.deduction) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="lateDeduction" label="迟到扣款" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.lateDeduction) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="absenceDeduction" label="缺勤扣款" width="100">
+          <template #default="{ row }">
+            {{ formatCurrency(row.absenceDeduction) }}
           </template>
         </el-table-column>
         <el-table-column prop="socialSecurity" label="社保公积金" width="120">

@@ -160,6 +160,18 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Download } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import { useAttendanceStore } from '@/stores/attendance'
+import { useDepartmentsStore } from '@/stores/departments'
+import { useEmployeesStore } from '@/stores/employees'
+import { storeToRefs } from 'pinia'
+
+// 初始化store
+const attendanceStore = useAttendanceStore()
+const departmentsStore = useDepartmentsStore()
+const employeesStore = useEmployeesStore()
+
+// 从store获取数据
+const { isLoading, error } = storeToRefs(attendanceStore)
 
 // 年份选项
 const currentYear = new Date().getFullYear()
@@ -176,13 +188,24 @@ const monthOptions = ref(Array.from({ length: 12 }, (_, i) => ({
 })))
 
 // 部门选项
-const departmentOptions = ref([
-  { value: '1', label: '研发部' },
-  { value: '2', label: '市场部' },
-  { value: '3', label: '销售部' },
-  { value: '4', label: '财务部' },
-  { value: '5', label: '人事部' }
-])
+const departmentOptions = ref([])
+
+// 加载状态
+const loading = ref(false)
+
+// 加载部门和员工数据
+const loadOptions = async () => {
+  try {
+    // 加载部门数据
+    await departmentsStore.getDepartments()
+    departmentOptions.value = departmentsStore.departments.map(dept => ({
+      value: dept.id,
+      label: dept.name
+    }))
+  } catch (err) {
+    ElMessage.error('加载选项数据失败')
+  }
+}
 
 // 筛选表单
 const filterForm = reactive({
@@ -193,24 +216,21 @@ const filterForm = reactive({
   departmentId: ''
 })
 
-// 统计卡片数据
-const statisticsCards = ref([
-  { title: '考勤人数', value: '126', icon: 'User', color: '#409EFF' },
-  { title: '平均出勤率', value: '96.3%', icon: 'Calendar', color: '#67C23A' },
-  { title: '迟到/早退', value: '18', icon: 'Warning', color: '#E6A23C' },
-  { title: '加班总时长', value: '326小时', icon: 'Timer', color: '#F56C6C' }
-])
-
 // 表格数据
 const tableData = ref([])
 
-// 加载状态
-const loading = ref(false)
-
 // 图表实例
-let statusChart = null
-let departmentChart = null
-let trendChart = null
+let statusChart: echarts.ECharts | null = null
+let departmentChart: echarts.ECharts | null = null
+let trendChart: echarts.ECharts | null = null
+
+// 统计卡片数据
+const statisticsCards = ref([
+  { title: '考勤人数', value: '0', icon: 'User', color: '#409EFF' },
+  { title: '平均出勤率', value: '0%', icon: 'Calendar', color: '#67C23A' },
+  { title: '迟到/早退', value: '0', icon: 'Warning', color: '#E6A23C' },
+  { title: '缺勤人次', value: '0', icon: 'CircleClose', color: '#F56C6C' }
+])
 
 // 出勤率颜色
 const getAttendanceRateColor = (rate) => {
@@ -219,95 +239,27 @@ const getAttendanceRateColor = (rate) => {
   return '#F56C6C'
 }
 
-// 处理筛选
-const handleFilter = () => {
-  fetchData()
-}
-
-// 处理重置
-const handleReset = () => {
-  filterForm.type = 'month'
-  filterForm.year = currentYear
-  filterForm.month = new Date().getMonth() + 1
-  filterForm.quarter = Math.floor((new Date().getMonth() / 3) + 1).toString()
-  filterForm.departmentId = ''
-  fetchData()
-}
-
-// 导出报表
-const handleExport = () => {
-  ElMessage.success('考勤统计报表导出成功')
-}
-
-// 获取统计数据
-const fetchData = () => {
-  loading.value = true
+// 更新状态分布图表
+const updateStatusChart = () => {
+  if (!statusChart) return;
   
-  // 模拟API调用
-  setTimeout(() => {
-    // 更新统计卡片
-    updateStatisticsCards()
-    
-    // 更新表格数据
-    updateTableData()
-    
-    // 更新图表
-    updateCharts()
-    
-    loading.value = false
-  }, 500)
-}
-
-// 更新统计卡片
-const updateStatisticsCards = () => {
-  const attendanceCount = Math.floor(Math.random() * 50) + 100
-  const attendanceRate = (Math.random() * 10 + 90).toFixed(1)
-  const lateEarlyCount = Math.floor(Math.random() * 20)
-  const overtimeHours = Math.floor(Math.random() * 200) + 200
+  // 统计各状态数量
+  const statusCounts = {
+    '正常': 0,
+    '迟到': 0,
+    '早退': 0,
+    '缺勤': 0,
+    '请假': 0
+  };
   
-  statisticsCards.value = [
-    { title: '考勤人数', value: attendanceCount.toString(), icon: 'User', color: '#409EFF' },
-    { title: '平均出勤率', value: `${attendanceRate}%`, icon: 'Calendar', color: '#67C23A' },
-    { title: '迟到/早退', value: lateEarlyCount.toString(), icon: 'Warning', color: '#E6A23C' },
-    { title: '加班总时长', value: `${overtimeHours}小时`, icon: 'Timer', color: '#F56C6C' }
-  ]
-}
-
-// 更新表格数据
-const updateTableData = () => {
-  const mockData = []
-  for (let i = 0; i < 10; i++) {
-    const deptIndex = i % 5
-    const attendanceDays = Math.floor(Math.random() * 5) + 15
-    const lateTimes = Math.floor(Math.random() * 3)
-    const earlyTimes = Math.floor(Math.random() * 2)
-    const absentTimes = Math.floor(Math.random() * 2)
-    const leaveTimes = Math.floor(Math.random() * 3)
-    const totalDays = 22
-    const attendanceRate = Math.round((attendanceDays / totalDays) * 100)
-    
-    mockData.push({
-      departmentName: ['研发部', '市场部', '销售部', '财务部', '人事部'][deptIndex],
-      departmentId: (deptIndex + 1).toString(),
-      employeeId: `EMP${1000 + i}`,
-      employeeName: ['张三', '李四', '王五', '赵六', '钱七'][i % 5],
-      attendanceDays,
-      lateTimes,
-      earlyTimes,
-      absentTimes,
-      leaveTimes,
-      overtimeHours: Math.floor(Math.random() * 10) + 2,
-      attendanceRate
-    })
-  }
+  tableData.value.forEach(item => {
+    statusCounts['正常'] += item.attendanceDays || 0;
+    statusCounts['迟到'] += item.lateTimes || 0;
+    statusCounts['早退'] += item.earlyTimes || 0;
+    statusCounts['缺勤'] += item.absentTimes || 0;
+    statusCounts['请假'] += item.leaveTimes || 0;
+  });
   
-  tableData.value = mockData
-}
-
-// 更新图表
-const updateCharts = () => {
-  // 状态分布图表
-  if (statusChart) {
     const statusOption = {
       title: {
         text: '',
@@ -348,22 +300,77 @@ const updateCharts = () => {
             show: false
           },
           data: [
-            { value: 335, name: '正常出勤' },
-            { value: 21, name: '迟到' },
-            { value: 14, name: '早退' },
-            { value: 8, name: '缺勤' },
-            { value: 18, name: '请假' }
+          { value: statusCounts['正常'], name: '正常出勤' },
+          { value: statusCounts['迟到'], name: '迟到' },
+          { value: statusCounts['早退'], name: '早退' },
+          { value: statusCounts['缺勤'], name: '缺勤' },
+          { value: statusCounts['请假'], name: '请假' }
           ]
         }
       ],
       color: ['#67C23A', '#E6A23C', '#F56C6C', '#909399', '#409EFF']
+  };
+    
+  statusChart.setOption(statusOption);
+};
+  
+// 更新部门考勤对比图表
+const updateDepartmentChart = () => {
+  if (!departmentChart) return;
+  
+  // 按部门分组统计
+  const departmentStats = {};
+  
+  tableData.value.forEach(item => {
+    if (!departmentStats[item.departmentName]) {
+      departmentStats[item.departmentName] = {
+        total: 0,
+        normal: 0,
+        late: 0,
+        early: 0,
+        absent: 0,
+        leave: 0
+      };
     }
     
-    statusChart.setOption(statusOption)
-  }
+    const stats = departmentStats[item.departmentName];
+    const total = (item.attendanceDays || 0) + (item.lateTimes || 0) + 
+                  (item.earlyTimes || 0) + (item.absentTimes || 0) + 
+                  (item.leaveTimes || 0);
+    
+    stats.total += total;
+    stats.normal += item.attendanceDays || 0;
+    stats.late += item.lateTimes || 0;
+    stats.early += item.earlyTimes || 0;
+    stats.absent += item.absentTimes || 0;
+    stats.leave += item.leaveTimes || 0;
+  });
   
-  // 部门考勤对比图表
-  if (departmentChart) {
+  // 计算各部门的百分比
+  const departments = Object.keys(departmentStats);
+  const normalRates = [];
+  const lateRates = [];
+  const earlyRates = [];
+  const absentRates = [];
+  const leaveRates = [];
+  
+  departments.forEach(dept => {
+    const stats = departmentStats[dept];
+    if (stats.total > 0) {
+      normalRates.push(Math.round((stats.normal / stats.total) * 100));
+      lateRates.push(Math.round((stats.late / stats.total) * 100));
+      earlyRates.push(Math.round((stats.early / stats.total) * 100));
+      absentRates.push(Math.round((stats.absent / stats.total) * 100));
+      leaveRates.push(Math.round((stats.leave / stats.total) * 100));
+    } else {
+      normalRates.push(0);
+      lateRates.push(0);
+      earlyRates.push(0);
+      absentRates.push(0);
+      leaveRates.push(0);
+    }
+  });
+  
     const departmentOption = {
       tooltip: {
         trigger: 'axis',
@@ -386,54 +393,59 @@ const updateCharts = () => {
       },
       yAxis: {
         type: 'category',
-        data: ['研发部', '市场部', '销售部', '财务部', '人事部']
+      data: departments
       },
       series: [
         {
           name: '正常出勤率',
           type: 'bar',
           stack: 'total',
-          data: [92, 94, 89, 97, 95],
+        data: normalRates,
           color: '#67C23A'
         },
         {
           name: '迟到率',
           type: 'bar',
           stack: 'total',
-          data: [3, 2, 4, 1, 2],
+        data: lateRates,
           color: '#E6A23C'
         },
         {
           name: '早退率',
           type: 'bar',
           stack: 'total',
-          data: [2, 1, 3, 0, 1],
+        data: earlyRates,
           color: '#F56C6C'
         },
         {
           name: '缺勤率',
           type: 'bar',
           stack: 'total',
-          data: [1, 1, 2, 0, 0],
+        data: absentRates,
           color: '#909399'
         },
         {
           name: '请假率',
           type: 'bar',
           stack: 'total',
-          data: [2, 2, 2, 2, 2],
+        data: leaveRates,
           color: '#409EFF'
         }
       ]
-    }
+  };
     
-    departmentChart.setOption(departmentOption)
-  }
+  departmentChart.setOption(departmentOption);
+};
   
-  // 趋势图表
-  if (trendChart) {
-    const days = Array.from({ length: 30 }, (_, i) => i + 1)
-    const attendanceRates = days.map(() => Math.floor(Math.random() * 15) + 85)
+// 更新趋势图表
+const updateTrendChart = () => {
+  if (!trendChart) return;
+  
+  // 这里需要按日期统计，但当前数据可能不包含日期维度
+  // 可以考虑添加API获取按日期的统计数据
+  // 暂时使用模拟数据
+  const days = Array.from({ length: 30 }, (_, i) => i + 1);
+  const attendanceRates = days.map(() => Math.floor(Math.random() * 15) + 85);
     
     const trendOption = {
       tooltip: {
@@ -482,30 +494,200 @@ const updateCharts = () => {
           }
         }
       ]
+  };
+    
+  trendChart.setOption(trendOption);
+};
+
+// 处理筛选
+const handleFilter = () => {
+  fetchData();
+};
+
+// 处理重置
+const handleReset = () => {
+  filterForm.type = 'month';
+  filterForm.year = currentYear;
+  filterForm.month = new Date().getMonth() + 1;
+  filterForm.quarter = Math.floor((new Date().getMonth() / 3) + 1).toString();
+  filterForm.departmentId = '';
+  
+  fetchData();
+};
+
+// 导出报表
+const handleExport = () => {
+  ElMessage.success('考勤报表导出成功');
+};
+
+// 获取考勤统计数据
+const fetchData = async () => {
+  loading.value = true
+  
+  try {
+    // 构建查询参数
+    const params: any = {
+      year: filterForm.year
     }
     
-    trendChart.setOption(trendOption)
+    if (filterForm.type === 'month') {
+      params.month = filterForm.month
+    } else if (filterForm.type === 'quarter') {
+      // 计算季度对应的月份范围
+      const quarterStartMonth = (parseInt(filterForm.quarter) - 1) * 3 + 1
+      params.start_date = `${filterForm.year}-${quarterStartMonth.toString().padStart(2, '0')}-01`
+      params.end_date = `${filterForm.year}-${(quarterStartMonth + 2).toString().padStart(2, '0')}-31`
+    }
+    
+    if (filterForm.departmentId) {
+      params.department_id = filterForm.departmentId
+    }
+    
+    // 获取员工列表
+    const employees = await employeesStore.getEmployees({
+      department_id: filterForm.departmentId || undefined
+    })
+    
+    // 准备表格数据
+    const attendanceData = []
+    let totalAttendanceDays = 0
+    let totalLateTimes = 0
+    let totalEarlyTimes = 0
+    let totalAbsentTimes = 0
+    let totalLeaveTimes = 0
+    
+    // 为每个员工获取考勤统计
+    for (const employee of employees) {
+      try {
+        // 获取员工考勤统计
+        const stats = await attendanceStore.getEmployeeAttendances(employee.id, params)
+        
+        // 分析考勤数据
+        let normalDays = 0
+        let lateTimes = 0
+        let earlyTimes = 0
+        let absentTimes = 0
+        let leaveTimes = 0
+        let overtimeHours = 0
+        
+        for (const record of stats) {
+          if (record.status) {
+            if (record.status.name === '正常') {
+              normalDays++
+            } else if (record.status.name === '迟到') {
+              lateTimes++
+            } else if (record.status.name === '早退') {
+              earlyTimes++
+            } else if (record.status.name === '缺勤' || record.status.name === '旷工') {
+              absentTimes++
+            } else if (record.status.name.includes('假')) {
+              leaveTimes++
+            }
+            
+            if (record.overtime_hours) {
+              overtimeHours += parseFloat(record.overtime_hours.toString())
+            }
+          }
+        }
+        
+        // 计算出勤率
+        const workDays = normalDays + lateTimes + earlyTimes + absentTimes + leaveTimes
+        const attendanceRate = workDays > 0 ? Math.round((normalDays / workDays) * 100) : 100
+        
+        // 添加到表格数据
+        attendanceData.push({
+          departmentId: employee.department_id,
+          departmentName: employee.department?.name || '-',
+          employeeId: employee.employee_id,
+          employeeName: employee.name,
+          attendanceDays: normalDays,
+          lateTimes,
+          earlyTimes,
+          absentTimes,
+          leaveTimes,
+          overtimeHours,
+          attendanceRate
+        })
+        
+        // 累加总数
+        totalAttendanceDays += normalDays
+        totalLateTimes += lateTimes
+        totalEarlyTimes += earlyTimes
+        totalAbsentTimes += absentTimes
+        totalLeaveTimes += leaveTimes
+      } catch (err) {
+        console.error(`获取员工 ${employee.id} 的考勤数据失败`, err)
+      }
+    }
+    
+    // 更新表格数据
+    tableData.value = attendanceData
+    
+    // 更新统计卡片
+    statisticsCards.value[0].value = employees.length.toString()
+    
+    const totalEmployees = attendanceData.length
+    if (totalEmployees > 0) {
+      const avgAttendanceRate = Math.round(
+        attendanceData.reduce((sum, item) => sum + item.attendanceRate, 0) / totalEmployees
+      )
+      statisticsCards.value[1].value = `${avgAttendanceRate}%`
+      statisticsCards.value[2].value = (totalLateTimes + totalEarlyTimes).toString()
+      statisticsCards.value[3].value = totalAbsentTimes.toString()
+    }
+    
+    // 更新图表
+    updateCharts()
+    
+  } catch (err) {
+    ElMessage.error('获取考勤统计数据失败')
+    console.error('获取考勤统计数据失败', err)
+  } finally {
+    loading.value = false
   }
+}
+
+// 更新图表
+const updateCharts = () => {
+  // 延迟一下，确保DOM已经更新
+  setTimeout(() => {
+    updateStatusChart()
+    updateDepartmentChart()
+    updateTrendChart()
+  }, 100)
 }
 
 // 初始化图表
 const initCharts = () => {
-  // 初始化状态分布图表
-  statusChart = echarts.init(document.getElementById('statusChart'))
+  // 状态分布图表
+  if (document.getElementById('statusChart')) {
+    statusChart = echarts.init(document.getElementById('statusChart'));
+  }
   
-  // 初始化部门对比图表
-  departmentChart = echarts.init(document.getElementById('departmentChart'))
+  // 部门考勤对比图表
+  if (document.getElementById('departmentChart')) {
+    departmentChart = echarts.init(document.getElementById('departmentChart'));
+  }
   
-  // 初始化趋势图表
-  trendChart = echarts.init(document.getElementById('trendChart'))
+  // 趋势图表
+  if (document.getElementById('trendChart')) {
+    trendChart = echarts.init(document.getElementById('trendChart'));
+  }
   
   // 窗口大小变化时，重新调整图表大小
   window.addEventListener('resize', () => {
-    statusChart.resize()
-    departmentChart.resize()
-    trendChart.resize()
-  })
-}
+    statusChart?.resize();
+    departmentChart?.resize();
+    trendChart?.resize();
+  });
+};
+
+// 页面加载时初始化
+onMounted(() => {
+  loadOptions();
+  initCharts();
+  fetchData();
+});
 
 // 监听筛选条件变化
 watch(() => filterForm.type, (newVal) => {
@@ -514,14 +696,6 @@ watch(() => filterForm.type, (newVal) => {
   } else if (newVal === 'quarter') {
     filterForm.quarter = Math.floor((new Date().getMonth() / 3) + 1).toString()
   }
-})
-
-onMounted(() => {
-  // 初始化图表
-  initCharts()
-  
-  // 加载数据
-  fetchData()
 })
 </script>
 

@@ -31,16 +31,17 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="姓名/工号">
-          <el-input v-model="searchForm.keyword" placeholder="请输入姓名或工号" clearable />
+        <el-form-item label="员工ID">
+          <el-input v-model="searchForm.employeeId" placeholder="请输入员工ID" clearable />
         </el-form-item>
         <el-form-item label="考勤状态">
-          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
-            <el-option label="正常" value="正常" />
-            <el-option label="迟到" value="迟到" />
-            <el-option label="早退" value="早退" />
-            <el-option label="缺勤" value="缺勤" />
-            <el-option label="请假" value="请假" />
+          <el-select v-model="searchForm.statusId" placeholder="请选择状态" clearable>
+            <el-option 
+              v-for="status in attendanceStatuses" 
+              :key="status.id" 
+              :label="status.name" 
+              :value="status.id" 
+            />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -52,29 +53,27 @@
     
     <div class="data-table">
       <el-table
-        :data="tableData"
+        :data="attendances"
         style="width: 100%"
         border
         stripe
-        v-loading="loading"
+        v-loading="isLoading"
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="date" label="日期" width="120" sortable />
-        <el-table-column prop="employeeId" label="工号" width="100" />
-        <el-table-column prop="employeeName" label="姓名" width="100" />
-        <el-table-column prop="departmentName" label="部门" width="100" />
-        <el-table-column prop="checkInTime" label="签到时间" width="120" />
-        <el-table-column prop="checkOutTime" label="签退时间" width="120" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="employee.employee_id" label="工号" width="100" />
+        <el-table-column prop="employee.name" label="姓名" width="100" />
+        <el-table-column prop="employee.department.name" label="部门" width="100" />
+        <el-table-column prop="status.name" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
-              {{ row.status }}
+            <el-tag :type="getStatusType(row.status.name)">
+              {{ row.status.name }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="overtimeHours" label="加班时长" width="100">
+        <el-table-column prop="overtime_hours" label="加班时长" width="100">
           <template #default="{ row }">
-            {{ row.overtimeHours ? `${row.overtimeHours}小时` : '-' }}
+            {{ row.overtime_hours ? `${row.overtime_hours}小时` : '-' }}
           </template>
         </el-table-column>
         <el-table-column prop="remarks" label="备注" />
@@ -93,7 +92,7 @@
         v-model:page-size="pageSize"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
-        :total="total"
+        :total="totalCount"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
       />
@@ -119,8 +118,8 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="员工" prop="employeeId">
-          <el-select v-model="form.employeeId" placeholder="请选择员工" style="width: 100%">
+        <el-form-item label="员工" prop="employee_id">
+          <el-select v-model="form.employee_id" placeholder="请选择员工" style="width: 100%">
             <el-option
               v-for="item in employeeOptions"
               :key="item.value"
@@ -129,35 +128,19 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="签到时间" prop="checkInTime">
-          <el-time-picker
-            v-model="form.checkInTime"
-            format="HH:mm:ss"
-            placeholder="选择时间"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="签退时间" prop="checkOutTime">
-          <el-time-picker
-            v-model="form.checkOutTime"
-            format="HH:mm:ss"
-            placeholder="选择时间"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="form.status" placeholder="请选择状态" style="width: 100%">
-            <el-option label="正常" value="正常" />
-            <el-option label="迟到" value="迟到" />
-            <el-option label="早退" value="早退" />
-            <el-option label="缺勤" value="缺勤" />
-            <el-option label="病假" value="病假" />
-            <el-option label="事假" value="事假" />
+        <el-form-item label="状态" prop="status_id">
+          <el-select v-model="form.status_id" placeholder="请选择状态" style="width: 100%">
+            <el-option 
+              v-for="status in attendanceStatuses" 
+              :key="status.id" 
+              :label="status.name" 
+              :value="status.id" 
+            />
           </el-select>
         </el-form-item>
-        <el-form-item label="加班时长" prop="overtimeHours">
+        <el-form-item label="加班时长" prop="overtime_hours">
           <el-input-number
-            v-model="form.overtimeHours"
+            v-model="form.overtime_hours"
             :min="0"
             :max="24"
             :precision="1"
@@ -185,9 +168,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { Plus, Search, Refresh, Upload, Download } from '@element-plus/icons-vue'
+import { useAttendanceStore } from '@/stores/attendance'
+import { storeToRefs } from 'pinia'
+import { useDepartmentsStore } from '@/stores/departments'
+import { useEmployeesStore } from '@/stores/employees'
+
+// 初始化store
+const attendanceStore = useAttendanceStore()
+const departmentsStore = useDepartmentsStore()
+const employeesStore = useEmployeesStore()
+
+// 从store获取数据
+const { attendances, attendanceStatuses, totalCount, isLoading, error } = storeToRefs(attendanceStore)
 
 // 日期快捷选项
 const dateShortcuts = [
@@ -221,41 +216,46 @@ const dateShortcuts = [
 ]
 
 // 部门选项
-const departmentOptions = ref([
-  { value: '1', label: '研发部' },
-  { value: '2', label: '市场部' },
-  { value: '3', label: '销售部' },
-  { value: '4', label: '财务部' },
-  { value: '5', label: '人事部' }
-])
+const departmentOptions = ref([])
 
 // 员工选项
-const employeeOptions = ref([
-  { value: 'EMP001', label: '张三 (EMP001)' },
-  { value: 'EMP002', label: '李四 (EMP002)' },
-  { value: 'EMP003', label: '王五 (EMP003)' },
-  { value: 'EMP004', label: '赵六 (EMP004)' },
-  { value: 'EMP005', label: '钱七 (EMP005)' }
-])
+const employeeOptions = ref([])
+
+// 加载部门和员工数据
+const loadOptions = async () => {
+  try {
+    // 加载部门数据
+    await departmentsStore.getDepartments()
+    departmentOptions.value = departmentsStore.departments.map(dept => ({
+      value: dept.id,
+      label: dept.name
+    }))
+    
+    // 加载员工数据
+    await employeesStore.getEmployees()
+    employeeOptions.value = employeesStore.employees.map(emp => ({
+      value: emp.id,
+      label: `${emp.name} (${emp.employee_id})`
+    }))
+    
+    // 加载考勤状态
+    await attendanceStore.getAttendanceStatuses()
+  } catch (err) {
+    ElMessage.error('加载选项数据失败')
+  }
+}
 
 // 搜索表单
 const searchForm = reactive({
   dateRange: [],
   departmentId: '',
-  keyword: '',
-  status: ''
+  employeeId: '',
+  statusId: ''
 })
-
-// 表格数据
-const tableData = ref([])
 
 // 分页
 const currentPage = ref(1)
 const pageSize = ref(10)
-const total = ref(0)
-
-// 加载状态
-const loading = ref(false)
 
 // 对话框相关
 const dialogVisible = ref(false)
@@ -263,12 +263,10 @@ const isEdit = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive({
   id: '',
-  date: '',
-  employeeId: '',
-  checkInTime: '',
-  checkOutTime: '',
-  status: '正常',
-  overtimeHours: 0,
+  date: new Date(),
+  employee_id: '',
+  status_id: '',
+  overtime_hours: 0,
   remarks: ''
 })
 
@@ -277,70 +275,31 @@ const rules = {
   date: [
     { required: true, message: '请选择日期', trigger: 'change' }
   ],
-  employeeId: [
+  employee_id: [
     { required: true, message: '请选择员工', trigger: 'change' }
   ],
-  checkInTime: [
-    { required: true, message: '请选择签到时间', trigger: 'change' }
-  ],
-  status: [
+  status_id: [
     { required: true, message: '请选择状态', trigger: 'change' }
   ]
 }
 
 // 获取考勤记录数据
-const fetchData = () => {
-  loading.value = true
-  
-  // 模拟API调用
-  setTimeout(() => {
-    // 模拟数据
-    const mockData = []
-    
-    for (let i = 0; i < 10; i++) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      
-      const statuses = ['正常', '迟到', '早退', '缺勤', '病假', '事假']
-      const status = statuses[Math.floor(Math.random() * statuses.length)]
-      
-      // 根据状态设置不同的时间
-      let checkInTime = '09:00:00'
-      let checkOutTime = '18:00:00'
-      let overtimeHours = 0
-      
-      if (status === '迟到') {
-        checkInTime = '09:' + (Math.floor(Math.random() * 30) + 15) + ':00'
-      } else if (status === '早退') {
-        checkOutTime = '17:' + Math.floor(Math.random() * 30) + ':00'
-      } else if (status === '缺勤') {
-        checkInTime = ''
-        checkOutTime = ''
-      } else if (Math.random() > 0.7) {
-        // 加班
-        overtimeHours = Math.floor(Math.random() * 4) + 1
-        checkOutTime = (18 + Math.floor(overtimeHours)) + ':00:00'
-      }
-      
-      mockData.push({
-        id: i + 1,
-        date: date.toISOString().split('T')[0],
-        employeeId: 'EMP00' + (i % 5 + 1),
-        employeeName: ['张三', '李四', '王五', '赵六', '钱七'][i % 5],
-        departmentName: ['研发部', '市场部', '销售部', '财务部', '人事部'][i % 5],
-        departmentId: (i % 5 + 1).toString(),
-        checkInTime,
-        checkOutTime,
-        status,
-        overtimeHours: status === '正常' ? overtimeHours : 0,
-        remarks: status === '正常' ? (overtimeHours > 0 ? '加班处理项目' : '') : '系统自动记录'
-      })
+const fetchData = async () => {
+  try {
+    const params = {
+      skip: (currentPage.value - 1) * pageSize.value,
+      limit: pageSize.value,
+      department_id: searchForm.departmentId || undefined,
+      employee_id: searchForm.employeeId || undefined,
+      status_id: searchForm.statusId || undefined,
+      start_date: searchForm.dateRange && searchForm.dateRange[0] ? searchForm.dateRange[0].toISOString().split('T')[0] : undefined,
+      end_date: searchForm.dateRange && searchForm.dateRange[1] ? searchForm.dateRange[1].toISOString().split('T')[0] : undefined
     }
     
-    tableData.value = mockData
-    total.value = 68 // 模拟总数
-    loading.value = false
-  }, 500)
+    await attendanceStore.getAttendances(params)
+  } catch (err) {
+    ElMessage.error('获取考勤记录失败')
+  }
 }
 
 // 获取状态对应的标签类型
@@ -351,7 +310,8 @@ const getStatusType = (status: string) => {
     '早退': 'warning',
     '缺勤': 'danger',
     '病假': 'info',
-    '事假': 'info'
+    '事假': 'info',
+    '年假': 'info'
   }
   return map[status] || 'info'
 }
@@ -366,8 +326,8 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.dateRange = []
   searchForm.departmentId = ''
-  searchForm.keyword = ''
-  searchForm.status = ''
+  searchForm.employeeId = ''
+  searchForm.statusId = ''
   handleSearch()
 }
 
@@ -388,11 +348,9 @@ const handleAdd = () => {
   isEdit.value = false
   form.id = ''
   form.date = new Date()
-  form.employeeId = ''
-  form.checkInTime = new Date(new Date().setHours(9, 0, 0))
-  form.checkOutTime = new Date(new Date().setHours(18, 0, 0))
-  form.status = '正常'
-  form.overtimeHours = 0
+  form.employee_id = ''
+  form.status_id = ''
+  form.overtime_hours = 0
   form.remarks = ''
   
   dialogVisible.value = true
@@ -402,89 +360,43 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   isEdit.value = true
   form.id = row.id
-  form.date = row.date
-  form.employeeId = row.employeeId
-  
-  // 转换时间字符串为Date对象
-  if (row.checkInTime) {
-    const [hours, minutes, seconds] = row.checkInTime.split(':').map(Number)
-    form.checkInTime = new Date(new Date().setHours(hours, minutes, seconds))
-  } else {
-    form.checkInTime = null
-  }
-  
-  if (row.checkOutTime) {
-    const [hours, minutes, seconds] = row.checkOutTime.split(':').map(Number)
-    form.checkOutTime = new Date(new Date().setHours(hours, minutes, seconds))
-  } else {
-    form.checkOutTime = null
-  }
-  
-  form.status = row.status
-  form.overtimeHours = row.overtimeHours || 0
+  form.date = new Date(row.date)
+  form.employee_id = row.employee.id
+  form.status_id = row.status.id
+  form.overtime_hours = row.overtime_hours || 0
   form.remarks = row.remarks || ''
   
   dialogVisible.value = true
 }
 
 // 保存考勤记录
-const handleSave = () => {
-  formRef.value?.validate((valid) => {
+const handleSave = async () => {
+  formRef.value?.validate(async (valid) => {
     if (valid) {
-      // 实际项目中应该调用API
-      if (isEdit.value) {
-        // 更新现有记录
-        const index = tableData.value.findIndex(item => item.id === form.id)
-        if (index !== -1) {
-          // 获取员工信息
-          const employee = employeeOptions.value.find(item => item.value === form.employeeId)
-          const employeeName = employee ? employee.label.split(' ')[0] : ''
-          
-          // 更新数据
-          tableData.value[index] = {
-            ...tableData.value[index],
-            date: form.date,
-            employeeId: form.employeeId,
-            employeeName,
-            checkInTime: form.checkInTime ? form.checkInTime.toTimeString().split(' ')[0] : '',
-            checkOutTime: form.checkOutTime ? form.checkOutTime.toTimeString().split(' ')[0] : '',
-            status: form.status,
-            overtimeHours: form.overtimeHours,
-            remarks: form.remarks
-          }
-          
-          ElMessage.success('考勤记录更新成功')
-        }
-      } else {
-        // 添加新记录
-        // 获取员工信息
-        const employee = employeeOptions.value.find(item => item.value === form.employeeId)
-        const employeeName = employee ? employee.label.split(' ')[0] : ''
-        const department = Math.floor(Math.random() * 5)
-        
-        // 创建新记录
-        const newRecord = {
-          id: tableData.value.length + 1,
-          date: form.date,
-          employeeId: form.employeeId,
-          employeeName,
-          departmentName: ['研发部', '市场部', '销售部', '财务部', '人事部'][department],
-          departmentId: (department + 1).toString(),
-          checkInTime: form.checkInTime ? form.checkInTime.toTimeString().split(' ')[0] : '',
-          checkOutTime: form.checkOutTime ? form.checkOutTime.toTimeString().split(' ')[0] : '',
-          status: form.status,
-          overtimeHours: form.overtimeHours,
+      try {
+        const attendanceData = {
+          employee_id: form.employee_id,
+          date: form.date.toISOString().split('T')[0],
+          status_id: form.status_id,
+          overtime_hours: form.overtime_hours,
           remarks: form.remarks
         }
         
-        // 添加到表格数据
-        tableData.value.unshift(newRecord)
-        total.value++
+        if (isEdit.value) {
+          // 更新现有记录
+          await attendanceStore.updateAttendance(form.id, attendanceData)
+          ElMessage.success('考勤记录更新成功')
+        } else {
+          // 添加新记录
+          await attendanceStore.createAttendance(attendanceData)
+          ElMessage.success('考勤记录添加成功')
+        }
         
-        ElMessage.success('考勤记录添加成功')
+        dialogVisible.value = false
+        fetchData() // 重新加载数据
+      } catch (err: any) {
+        ElMessage.error(err.message || '操作失败')
       }
-      
-      dialogVisible.value = false
     }
   })
 }
@@ -492,20 +404,20 @@ const handleSave = () => {
 // 删除考勤记录
 const handleDelete = (row) => {
   ElMessageBox.confirm(
-    `确定要删除 ${row.employeeName} 在 ${row.date} 的考勤记录吗？`,
+    `确定要删除 ${row.employee.name} 在 ${row.date} 的考勤记录吗？`,
     '删除确认',
     {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
     }
-  ).then(() => {
-    // 实际项目中应该调用API
-    const index = tableData.value.findIndex(item => item.id === row.id)
-    if (index !== -1) {
-      tableData.value.splice(index, 1)
-      total.value--
+  ).then(async () => {
+    try {
+      await attendanceStore.deleteAttendance(row.id)
       ElMessage.success('考勤记录删除成功')
+      fetchData() // 重新加载数据
+    } catch (err: any) {
+      ElMessage.error(err.message || '删除失败')
     }
   }).catch(() => {
     ElMessage.info('已取消删除')
@@ -523,6 +435,7 @@ const handleExport = () => {
 }
 
 onMounted(() => {
+  loadOptions()
   fetchData()
 })
 </script>

@@ -2,7 +2,15 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { get, post, put } from '@/utils/request';
 
-// 员工薪资项目类型定义
+// 员工薪资配置项类型定义
+export interface SalaryConfigItem {
+  item_id: number;
+  value: number;
+  base_item?: string | null;
+  effective_date: string;
+}
+
+// 员工薪资项目类型定义（用于展示）
 export interface EmployeeSalaryItem {
   id: number;
   item_id: number;
@@ -18,6 +26,12 @@ export interface EmployeeSalaryItem {
 export interface EmployeeSalaryConfig {
   employee_id: number;
   items: EmployeeSalaryItem[];
+}
+
+// 员工薪资配置保存请求类型
+export interface EmployeeSalaryConfigSaveRequest {
+  employee_id: number;
+  items: SalaryConfigItem[];
 }
 
 export const useSalaryConfigStore = defineStore('salaryConfig', () => {
@@ -60,7 +74,7 @@ export const useSalaryConfigStore = defineStore('salaryConfig', () => {
   }
 
   // 保存员工薪资配置
-  async function saveEmployeeSalaryConfig(employeeId: number, config: EmployeeSalaryConfig) {
+  async function saveEmployeeSalaryConfig(employeeId: number, config: EmployeeSalaryConfigSaveRequest) {
     isLoading.value = true;
     error.value = null;
     

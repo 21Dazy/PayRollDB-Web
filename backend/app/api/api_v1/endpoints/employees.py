@@ -1,18 +1,20 @@
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, String, cast
+from sqlalchemy import or_, String, cast, and_, extract
 
 from app.api.deps import get_current_hr_user, get_current_user, get_db
-from app.crud.crud_employee import employee
 from app.models.user import User
+from app.models.employee import Employee
 from app.models.department import Department
 from app.models.position import Position
+from app.models.salary_record import SalaryRecord
+from app.crud import employee
 from app.schemas.employee import (
-    EmployeeCreate, EmployeeUpdate, EmployeeResponse, EmployeeDetailResponse,
-    EmployeeLeaveRequest, EmployeeSearchResponse
+    EmployeeCreate, EmployeeUpdate, EmployeeResponse, 
+    EmployeeDetailResponse, EmployeeLeaveRequest, EmployeeSearchResponse
 )
 from app.core.security import encrypt_bank_account
 from app.utils.log import log_operation
@@ -250,7 +252,7 @@ def leave_employee(
     
     return employee_obj
 
-@router.get("/{employee_id}/salaries", response_model=List)
+@router.get("/{employee_id}/salaries", response_model=List[Dict[str, Any]])
 def read_employee_salaries(
     employee_id: int,
     year: Optional[int] = None,
@@ -276,9 +278,44 @@ def read_employee_salaries(
             detail="员工不存在"
         )
     
-    # 使用筛选条件获取工资记录
-    # 这里需要实现工资记录的获取逻辑
-    return []
+    # 构建查询
+    query = db.query(SalaryRecord).filter(SalaryRecord.employee_id == employee_id)
+    
+    # 添加年份筛选
+    if year:
+        query = query.filter(SalaryRecord.year == year)
+    
+    # 添加月份筛选
+    if month:
+        query = query.filter(SalaryRecord.month == month)
+    
+    # 获取记录并转换为字典
+    records = query.all()
+    result = []
+    
+    for record in records:
+        # 创建一个新的字典，只包含需要的属性
+        record_dict = {
+            "id": record.id,
+            "employeeId": record.employee_id,
+            "year": record.year,
+            "month": record.month,
+            "baseSalary": float(record.base_salary),
+            "overtimePay": float(record.overtime_pay),
+            "bonus": float(record.bonus),
+            "deduction": float(record.deduction),
+            "socialSecurity": float(record.social_security),
+            "personalTax": float(record.personal_tax),
+            "netSalary": float(record.net_salary),
+            "status": record.status,
+            "paymentDate": record.payment_date,
+            "remark": record.remark,
+            "createdAt": record.created_at,
+            "updatedAt": record.updated_at
+        }
+        result.append(record_dict)
+    
+    return result
 
 @router.get("/{employee_id}/attendance", response_model=List)
 def read_employee_attendance(

@@ -90,8 +90,14 @@ class SalaryRecordBase(BaseModel):
     base_salary: float
     overtime_pay: float = 0
     bonus: float = 0
+    performance_bonus: float = 0
+    attendance_bonus: float = 0
+    transportation_allowance: float = 0
+    meal_allowance: float = 0
     deduction: float = 0
     social_security: float = 0
+    late_deduction: float = 0
+    absence_deduction: float = 0
     personal_tax: float = 0
     net_salary: float
     status: SalaryStatus = SalaryStatus.pending
@@ -148,8 +154,14 @@ class SalaryRecordDetailResponse(BaseModel):
     base_salary: float
     overtime_pay: float
     bonus: float
+    performance_bonus: float = 0
+    attendance_bonus: float = 0
+    transportation_allowance: float = 0
+    meal_allowance: float = 0
     deduction: float
     social_security: float
+    late_deduction: float = 0
+    absence_deduction: float = 0
     personal_tax: float
     net_salary: float
     status: SalaryStatus

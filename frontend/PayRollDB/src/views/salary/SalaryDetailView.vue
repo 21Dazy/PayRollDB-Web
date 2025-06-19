@@ -52,7 +52,7 @@
           <el-col :span="8">
             <div class="summary-card primary">
               <div class="card-title">实发工资</div>
-              <div class="card-value">¥{{ formatNumber(salaryData.netSalary || totalIncome - totalDeduction) }}</div>
+              <div class="card-value">¥{{ formatNumber(calculateNetSalary()) }}</div>
             </div>
           </el-col>
         </el-row>
@@ -209,11 +209,66 @@ const incomeItems = computed(() => {
     console.warn('薪资详情数据不完整或格式不正确', salaryData.value)
     
     // 如果没有明细数据但有基本工资，则添加一个基本工资项
-    if (salaryData.value && typeof salaryData.value.baseSalary === 'number' && salaryData.value.baseSalary > 0) {
-      return [{
-        name: '基本工资',
-        amount: salaryData.value.baseSalary
-      }]
+    if (salaryData.value) {
+      const items = [];
+      
+      // 添加基本工资
+      if (typeof salaryData.value.baseSalary === 'number' && salaryData.value.baseSalary > 0) {
+        items.push({
+          name: '基本工资',
+          amount: salaryData.value.baseSalary
+        });
+      }
+      
+      // 添加加班费
+      if (typeof salaryData.value.overtimePay === 'number' && salaryData.value.overtimePay > 0) {
+        items.push({
+          name: '加班费',
+          amount: salaryData.value.overtimePay
+        });
+      }
+      
+      // 添加奖金
+      if (typeof salaryData.value.bonus === 'number' && salaryData.value.bonus > 0) {
+        items.push({
+          name: '奖金',
+          amount: salaryData.value.bonus
+        });
+      }
+      
+      // 添加绩效奖金
+      if (typeof salaryData.value.performanceBonus === 'number' && salaryData.value.performanceBonus > 0) {
+        items.push({
+          name: '绩效奖金',
+          amount: salaryData.value.performanceBonus
+        });
+      }
+      
+      // 添加全勤奖
+      if (typeof salaryData.value.attendanceBonus === 'number' && salaryData.value.attendanceBonus > 0) {
+        items.push({
+          name: '全勤奖',
+          amount: salaryData.value.attendanceBonus
+        });
+      }
+      
+      // 添加交通补贴
+      if (typeof salaryData.value.transportationAllowance === 'number' && salaryData.value.transportationAllowance > 0) {
+        items.push({
+          name: '交通补贴',
+          amount: salaryData.value.transportationAllowance
+        });
+      }
+      
+      // 添加餐补
+      if (typeof salaryData.value.mealAllowance === 'number' && salaryData.value.mealAllowance > 0) {
+        items.push({
+          name: '餐补',
+          amount: salaryData.value.mealAllowance
+        });
+      }
+      
+      return items;
     }
     
     return []
@@ -256,20 +311,70 @@ const incomeItems = computed(() => {
         }
       })
     
-    // 如果明细数据中没有收入项但有基本工资，则添加一个基本工资项
-    if (items.length === 0 && salaryData.value && typeof salaryData.value.baseSalary === 'number' && salaryData.value.baseSalary > 0) {
-      items.push({
-        name: '基本工资',
-        amount: salaryData.value.baseSalary
-      })
-    }
-    
-    // 如果有奖金，也添加到收入项中
-    if (salaryData.value && typeof salaryData.value.bonus === 'number' && salaryData.value.bonus > 0) {
-      items.push({
-        name: '奖金',
-        amount: salaryData.value.bonus
-      })
+    // 如果明细数据中没有收入项但有相关数据，则添加相应项目
+    if (salaryData.value) {
+      // 添加基本工资
+      if (typeof salaryData.value.baseSalary === 'number' && salaryData.value.baseSalary > 0 && 
+          !items.some(item => item.name.includes('基本工资'))) {
+        items.push({
+          name: '基本工资',
+          amount: salaryData.value.baseSalary
+        });
+      }
+      
+      // 添加加班费
+      if (typeof salaryData.value.overtimePay === 'number' && salaryData.value.overtimePay > 0 && 
+          !items.some(item => item.name.includes('加班费'))) {
+        items.push({
+          name: '加班费',
+          amount: salaryData.value.overtimePay
+        });
+      }
+      
+      // 添加奖金
+      if (typeof salaryData.value.bonus === 'number' && salaryData.value.bonus > 0 && 
+          !items.some(item => item.name.includes('奖金') && !item.name.includes('绩效奖金'))) {
+        items.push({
+          name: '奖金',
+          amount: salaryData.value.bonus
+        });
+      }
+      
+      // 添加绩效奖金
+      if (typeof salaryData.value.performanceBonus === 'number' && salaryData.value.performanceBonus > 0 && 
+          !items.some(item => item.name.includes('绩效奖金'))) {
+        items.push({
+          name: '绩效奖金',
+          amount: salaryData.value.performanceBonus
+        });
+      }
+      
+      // 添加全勤奖
+      if (typeof salaryData.value.attendanceBonus === 'number' && salaryData.value.attendanceBonus > 0 && 
+          !items.some(item => item.name.includes('全勤奖'))) {
+        items.push({
+          name: '全勤奖',
+          amount: salaryData.value.attendanceBonus
+        });
+      }
+      
+      // 添加交通补贴
+      if (typeof salaryData.value.transportationAllowance === 'number' && salaryData.value.transportationAllowance > 0 && 
+          !items.some(item => item.name.includes('交通补贴'))) {
+        items.push({
+          name: '交通补贴',
+          amount: salaryData.value.transportationAllowance
+        });
+      }
+      
+      // 添加餐补
+      if (typeof salaryData.value.mealAllowance === 'number' && salaryData.value.mealAllowance > 0 && 
+          !items.some(item => item.name.includes('餐补'))) {
+        items.push({
+          name: '餐补',
+          amount: salaryData.value.mealAllowance
+        });
+      }
     }
     
     console.log('处理后的收入项:', items)
@@ -287,30 +392,53 @@ const deductionItems = computed(() => {
     console.warn('薪资详情数据不完整或格式不正确', salaryData.value)
     
     // 如果没有明细数据但有扣除金额或社保，则添加相应项目
-    const items = []
-    
-    if (salaryData.value && typeof salaryData.value.deduction === 'number' && salaryData.value.deduction > 0) {
-      items.push({
-        name: '其他扣除',
-        amount: salaryData.value.deduction
-      })
+    if (salaryData.value) {
+      const items = []
+      
+      // 添加其他扣除
+      if (typeof salaryData.value.deduction === 'number' && salaryData.value.deduction > 0) {
+        items.push({
+          name: '其他扣除',
+          amount: salaryData.value.deduction
+        })
+      }
+      
+      // 添加社会保险
+      if (typeof salaryData.value.socialSecurity === 'number' && salaryData.value.socialSecurity > 0) {
+        items.push({
+          name: '社会保险',
+          amount: salaryData.value.socialSecurity
+        })
+      }
+      
+      // 添加个人所得税
+      if (typeof salaryData.value.personalTax === 'number' && salaryData.value.personalTax > 0) {
+        items.push({
+          name: '个人所得税',
+          amount: salaryData.value.personalTax
+        })
+      }
+      
+      // 添加迟到扣款
+      if (typeof salaryData.value.lateDeduction === 'number' && salaryData.value.lateDeduction > 0) {
+        items.push({
+          name: '迟到扣款',
+          amount: salaryData.value.lateDeduction
+        })
+      }
+      
+      // 添加缺勤扣款
+      if (typeof salaryData.value.absenceDeduction === 'number' && salaryData.value.absenceDeduction > 0) {
+        items.push({
+          name: '缺勤扣款',
+          amount: salaryData.value.absenceDeduction
+        })
+      }
+      
+      return items
     }
     
-    if (salaryData.value && typeof salaryData.value.socialSecurity === 'number' && salaryData.value.socialSecurity > 0) {
-      items.push({
-        name: '社会保险',
-        amount: salaryData.value.socialSecurity
-      })
-    }
-    
-    if (salaryData.value && typeof salaryData.value.personalTax === 'number' && salaryData.value.personalTax > 0) {
-      items.push({
-        name: '个人所得税',
-        amount: salaryData.value.personalTax
-      })
-    }
-    
-    return items
+    return []
   }
   
   try {
@@ -349,28 +477,51 @@ const deductionItems = computed(() => {
       })
     
     // 如果明细数据中没有扣除项但有相关数据，则添加相应项目
-    if (salaryData.value && typeof salaryData.value.deduction === 'number' && salaryData.value.deduction > 0 && 
-        !items.some(item => item.name.includes('扣除'))) {
-      items.push({
-        name: '其他扣除',
-        amount: salaryData.value.deduction
-      })
-    }
-    
-    if (salaryData.value && typeof salaryData.value.socialSecurity === 'number' && salaryData.value.socialSecurity > 0 && 
-        !items.some(item => item.name.includes('社会保险'))) {
-      items.push({
-        name: '社会保险',
-        amount: salaryData.value.socialSecurity
-      })
-    }
-    
-    if (salaryData.value && typeof salaryData.value.personalTax === 'number' && salaryData.value.personalTax > 0 && 
-        !items.some(item => item.name.includes('个人所得税'))) {
-      items.push({
-        name: '个人所得税',
-        amount: salaryData.value.personalTax
-      })
+    if (salaryData.value) {
+      // 添加其他扣除
+      if (typeof salaryData.value.deduction === 'number' && salaryData.value.deduction > 0 && 
+          !items.some(item => item.name.includes('扣除') && !item.name.includes('迟到扣款') && !item.name.includes('缺勤扣款'))) {
+        items.push({
+          name: '其他扣除',
+          amount: salaryData.value.deduction
+        })
+      }
+      
+      // 添加社会保险
+      if (typeof salaryData.value.socialSecurity === 'number' && salaryData.value.socialSecurity > 0 && 
+          !items.some(item => item.name.includes('社会保险') || item.name.includes('社保'))) {
+        items.push({
+          name: '社会保险',
+          amount: salaryData.value.socialSecurity
+        })
+      }
+      
+      // 添加个人所得税
+      if (typeof salaryData.value.personalTax === 'number' && salaryData.value.personalTax > 0 && 
+          !items.some(item => item.name.includes('个人所得税'))) {
+        items.push({
+          name: '个人所得税',
+          amount: salaryData.value.personalTax
+        })
+      }
+      
+      // 添加迟到扣款
+      if (typeof salaryData.value.lateDeduction === 'number' && salaryData.value.lateDeduction > 0 && 
+          !items.some(item => item.name.includes('迟到扣款'))) {
+        items.push({
+          name: '迟到扣款',
+          amount: salaryData.value.lateDeduction
+        })
+      }
+      
+      // 添加缺勤扣款
+      if (typeof salaryData.value.absenceDeduction === 'number' && salaryData.value.absenceDeduction > 0 && 
+          !items.some(item => item.name.includes('缺勤扣款'))) {
+        items.push({
+          name: '缺勤扣款',
+          amount: salaryData.value.absenceDeduction
+        })
+      }
     }
     
     console.log('处理后的扣除项:', items)
@@ -383,15 +534,91 @@ const deductionItems = computed(() => {
 
 // 总收入
 const totalIncome = computed(() => {
-  if (!incomeItems.value || !incomeItems.value.length) return 0
-  return incomeItems.value.reduce((sum: number, item: {amount: number}) => sum + (item.amount || 0), 0)
-})
+  if (!incomeItems.value || !incomeItems.value.length) {
+    // 如果没有收入项，尝试从基本数据中计算
+    if (salaryData.value) {
+      let total = 0;
+      
+      // 添加基本工资
+      if (typeof salaryData.value.baseSalary === 'number') {
+        total += salaryData.value.baseSalary;
+      }
+      
+      // 添加加班费
+      if (typeof salaryData.value.overtimePay === 'number') {
+        total += salaryData.value.overtimePay;
+      }
+      
+      // 添加奖金
+      if (typeof salaryData.value.bonus === 'number') {
+        total += salaryData.value.bonus;
+      }
+      
+      // 添加绩效奖金
+      if (typeof salaryData.value.performanceBonus === 'number') {
+        total += salaryData.value.performanceBonus;
+      }
+      
+      // 添加全勤奖
+      if (typeof salaryData.value.attendanceBonus === 'number') {
+        total += salaryData.value.attendanceBonus;
+      }
+      
+      // 添加交通补贴
+      if (typeof salaryData.value.transportationAllowance === 'number') {
+        total += salaryData.value.transportationAllowance;
+      }
+      
+      // 添加餐补
+      if (typeof salaryData.value.mealAllowance === 'number') {
+        total += salaryData.value.mealAllowance;
+      }
+      
+      return total;
+    }
+    return 0;
+  }
+  return incomeItems.value.reduce((sum: number, item: {amount: number}) => sum + (item.amount || 0), 0);
+});
 
 // 总扣除
 const totalDeduction = computed(() => {
-  if (!deductionItems.value || !deductionItems.value.length) return 0
-  return deductionItems.value.reduce((sum: number, item: {amount: number}) => sum + (item.amount || 0), 0)
-})
+  if (!deductionItems.value || !deductionItems.value.length) {
+    // 如果没有扣除项，尝试从基本数据中计算
+    if (salaryData.value) {
+      let total = 0;
+      
+      // 添加其他扣除
+      if (typeof salaryData.value.deduction === 'number') {
+        total += salaryData.value.deduction;
+      }
+      
+      // 添加社会保险
+      if (typeof salaryData.value.socialSecurity === 'number') {
+        total += salaryData.value.socialSecurity;
+      }
+      
+      // 添加个人所得税
+      if (typeof salaryData.value.personalTax === 'number') {
+        total += salaryData.value.personalTax;
+      }
+      
+      // 添加迟到扣款
+      if (typeof salaryData.value.lateDeduction === 'number') {
+        total += salaryData.value.lateDeduction;
+      }
+      
+      // 添加缺勤扣款
+      if (typeof salaryData.value.absenceDeduction === 'number') {
+        total += salaryData.value.absenceDeduction;
+      }
+      
+      return total;
+    }
+    return 0;
+  }
+  return deductionItems.value.reduce((sum: number, item: {amount: number}) => sum + (item.amount || 0), 0);
+});
 
 // 格式化货币
 const formatCurrency = (value: number | string | undefined | null): string => {
@@ -757,6 +984,30 @@ const formatPaymentDate = (dateString: string | null | undefined): string => {
     console.error('日期格式化错误:', error)
     return '-'
   }
+}
+
+// 计算实发工资
+const calculateNetSalary = () => {
+  if (!salaryData.value) return 0
+  
+  let netSalary = 0
+  
+  // 计算应发工资
+  let totalIncome = 0
+  if (incomeItems.value && incomeItems.value.length > 0) {
+    totalIncome = incomeItems.value.reduce((sum: number, item: {amount: number}) => sum + (item.amount || 0), 0)
+  }
+  
+  // 计算扣除金额
+  let totalDeduction = 0
+  if (deductionItems.value && deductionItems.value.length > 0) {
+    totalDeduction = deductionItems.value.reduce((sum: number, item: {amount: number}) => sum + (item.amount || 0), 0)
+  }
+  
+  // 计算实发工资
+  netSalary = totalIncome - totalDeduction
+  
+  return netSalary
 }
 </script>
 
