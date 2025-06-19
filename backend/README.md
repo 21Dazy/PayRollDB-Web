@@ -62,7 +62,30 @@ pip install -r requirements.txt
 CREATE DATABASE salary_management_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### 2. 初始化表结构和基础数据
+### 2. 数据库脚本说明
+
+项目提供了多个数据库脚本，位于`database/scripts`目录下：
+
+#### 基础数据库脚本
+- `database_design.sql` - 基础数据库设计脚本，创建初始的表结构
+- `database_designV2.sql` - 升级版数据库设计脚本，优化了表结构和索引
+- `consolidated_database_schema.sql` - 整合数据库脚本，包含完整的数据库结构
+
+#### 功能增强脚本
+- `user_self_service_enhancement.sql` - 用户自助服务功能增强脚本
+- `employee_salary_config.sql` - 员工薪资配置表创建脚本
+
+#### 数据更新脚本
+- `update_salary_components.sql` - 薪资组成项目更新脚本
+- `migrate_salary_data.sql` - 薪资数据迁移脚本
+
+可以根据需要执行这些脚本，或者直接运行初始化脚本：
+
+```bash
+python create_tables.py
+```
+
+### 3. 初始化表结构和基础数据
 
 运行创建表和初始化基础数据的脚本：
 
@@ -76,7 +99,7 @@ python create_tables.py
 - 默认社保配置
 - 系统参数
 
-### 3. 创建管理员用户
+### 4. 创建管理员用户
 
 运行创建管理员用户的脚本：
 
