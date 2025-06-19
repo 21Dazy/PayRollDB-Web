@@ -16,7 +16,7 @@
         <template #title>首页</template>
       </el-menu-item>
       
-      <el-sub-menu v-for="menu in sideMenus" :key="menu.key" :index="menu.key">
+      <el-sub-menu v-for="menu in filteredMenus" :key="menu.key" :index="menu.key">
         <template #title>
           <el-icon v-if="menu.icon"><component :is="menu.icon" /></el-icon>
           <span>{{ menu.title }}</span>
@@ -41,6 +41,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { 
   Calendar, 
   Money, 
@@ -51,27 +52,32 @@ import {
   Fold, 
   DataBoard,
   OfficeBuilding,
-  Suitcase
+  Suitcase,
+  Avatar
 } from '@element-plus/icons-vue'
 
-// 侧边栏菜单
-const sideMenus = ref([
+// 认证store
+const authStore = useAuthStore()
+
+// 管理员菜单 (admin, hr, manager角色可以看到的菜单)
+const adminMenus = ref([
   {
     key: 'salary',
     title: '薪资管理',
     icon: 'Money',
+    roles: ['admin', 'hr', 'manager'],
     children: [
       { key: 'salary-list', title: '薪资列表' },
       { key: 'salary-pay', title: '薪资发放' },
       { key: 'salary-items', title: '薪资项目' },
-      { key: 'salary-config', title: '薪资配置' },
-      { key: 'salary-statistics', title: '薪资统计' }
+      { key: 'salary-config', title: '薪资配置' }
     ]
   },
   {
     key: 'employee',
     title: '员工管理',
     icon: 'User',
+    roles: ['admin', 'hr', 'manager'],
     children: [
       { key: 'employee-list', title: '员工列表' },
       { key: 'employee-add', title: '添加员工' }
@@ -81,6 +87,7 @@ const sideMenus = ref([
     key: 'department',
     title: '部门管理',
     icon: 'OfficeBuilding',
+    roles: ['admin', 'hr'],
     children: [
       { key: 'department-list', title: '部门列表' },
       { key: 'department-add', title: '添加部门' }
@@ -90,6 +97,7 @@ const sideMenus = ref([
     key: 'position',
     title: '职位管理',
     icon: 'Suitcase',
+    roles: ['admin', 'hr'],
     children: [
       { key: 'position-list', title: '职位列表' },
       { key: 'position-add', title: '添加职位' }
@@ -99,16 +107,17 @@ const sideMenus = ref([
     key: 'attendance',
     title: '考勤管理',
     icon: 'Calendar',
+    roles: ['admin', 'hr', 'manager'],
     children: [
       { key: 'attendance-record', title: '考勤记录' },
-      { key: 'attendance-statistics', title: '考勤统计' },
-      { key: 'attendance-config', title: '考勤设置' }
+      { key: 'attendance-statistics', title: '考勤统计' }
     ]
   },
   {
     key: 'report',
     title: '报表统计',
     icon: 'PieChart',
+    roles: ['admin', 'hr', 'manager'],
     children: [
       { key: 'report-salary', title: '薪资报表' },
       { key: 'report-attendance', title: '考勤报表' },
@@ -119,6 +128,7 @@ const sideMenus = ref([
     key: 'system',
     title: '系统设置',
     icon: 'Setting',
+    roles: ['admin'],
     children: [
       { key: 'system-user', title: '用户管理' },
       { key: 'system-role', title: '角色管理' },
@@ -128,6 +138,40 @@ const sideMenus = ref([
     ]
   }
 ])
+
+// 普通用户菜单 (employee角色可以看到的菜单)
+const userMenus = ref([
+  {
+    key: 'user',
+    title: '用户中心',
+    icon: 'Avatar',
+    roles: ['employee', 'admin', 'hr', 'manager'],
+    children: [
+      { key: 'user-profile', title: '个人信息' },
+      { key: 'user-salary', title: '我的薪资' },
+      { key: 'user-attendance', title: '我的考勤' }
+    ]
+  }
+])
+
+// 根据用户角色过滤菜单
+const filteredMenus = computed(() => {
+  const userRole = authStore.user?.role
+  if (!userRole) return []
+
+  // 合并所有菜单
+  const allMenus = [...adminMenus.value, ...userMenus.value]
+  
+  // 根据角色过滤菜单
+  return allMenus.filter(menu => {
+    return menu.roles.includes(userRole)
+  })
+})
+
+// 获取当前用户角色
+const currentUserRole = computed(() => {
+  return authStore.user?.role || 'employee'
+})
 
 // 路由
 const router = useRouter()
@@ -171,8 +215,36 @@ const toggleCollapse = () => {
   emit('update:collapsed', isCollapse.value)
 }
 
+// 检查用户是否有权限访问某个菜单
+const hasPermission = (menuKey: string) => {
+  const userRole = currentUserRole.value
+  const allMenus = [...adminMenus.value, ...userMenus.value]
+  
+  for (const menu of allMenus) {
+    // 检查一级菜单权限
+    if (menu.key === menuKey) {
+      return menu.roles.includes(userRole)
+    }
+    
+    // 检查二级菜单权限
+    for (const subMenu of menu.children) {
+      if (subMenu.key === menuKey) {
+        return menu.roles.includes(userRole)
+      }
+    }
+  }
+  
+  return false
+}
+
 // 处理菜单选择
 const handleSelect = (key: string) => {
+  // 检查权限
+  if (!hasPermission(key) && key !== 'dashboard') {
+    console.warn(`用户 ${currentUserRole.value} 没有权限访问 ${key}`)
+    return
+  }
+  
   if (key === 'dashboard') {
     router.push('/dashboard')
     return
@@ -191,6 +263,11 @@ const handleSelect = (key: string) => {
     router.push(`/${mainRoute}/${subRoute}`)
   }
 }
+
+// 监听用户变化，重新计算菜单
+watch(() => authStore.user, () => {
+  console.log('用户信息更新，当前角色:', currentUserRole.value)
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">

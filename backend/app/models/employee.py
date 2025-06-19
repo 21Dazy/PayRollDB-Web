@@ -19,6 +19,9 @@ class Employee(Base):
     bank_name = Column(String(100), comment='开户行')
     bank_account = Column(String(100), comment='银行账号')
     bank_account_encrypted = Column(VARBINARY(255), comment='加密后的银行账号')
+    emergency_contact_name = Column(String(50), comment='紧急联系人姓名')
+    emergency_contact_phone = Column(String(20), comment='紧急联系人电话')
+    emergency_contact_relationship = Column(String(20), comment='紧急联系人关系')
     status = Column(Boolean, default=True, index=True, comment='状态(1:在职, 0:离职)')
     
     # 关系
@@ -28,4 +31,5 @@ class Employee(Base):
     attendances = relationship("Attendance", back_populates="employee")
     salary_records = relationship("SalaryRecord", back_populates="employee")
     social_security = relationship("EmployeeSocialSecurity", back_populates="employee")
-    salary_configs = relationship("EmployeeSalaryConfig", back_populates="employee") 
+    salary_configs = relationship("EmployeeSalaryConfig", back_populates="employee")
+    emergency_contacts = relationship("EmployeeEmergencyContact", back_populates="employee") 

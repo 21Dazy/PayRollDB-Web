@@ -18,5 +18,15 @@ from app.models.operation_log import OperationLog
 from app.models.user import User
 from app.models.system_parameter import SystemParameter
 
+# 导入用户注册相关模型
+from app.models.user_registration import (
+    UserRegistration,
+    UserPermission, 
+    EmployeeChangeRequest,
+    EmployeeEmergencyContact,
+    UserSetting,
+    UserActivityLog
+)
+
 # 导入关系定义，必须在所有模型导入后
 from app.models.relationships import * 

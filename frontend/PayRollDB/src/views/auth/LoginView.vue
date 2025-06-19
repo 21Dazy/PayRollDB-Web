@@ -119,8 +119,20 @@ const handleLogin = () => {
         await authStore.login(loginForm.username, loginForm.password, rememberMe.value)
         ElMessage.success('登录成功')
         
-        // 跳转到首页
-        router.push('/dashboard')
+        // 根据用户角色跳转到不同页面
+        const userRole = authStore.user?.role
+        console.log('登录成功，用户角色:', userRole)
+        
+        if (userRole === 'employee') {
+          // 普通用户跳转到个人中心
+          router.push('/user/profile')
+        } else if (userRole === 'admin' || userRole === 'hr' || userRole === 'manager') {
+          // 管理员跳转到首页
+          router.push('/dashboard')
+        } else {
+          // 默认跳转到首页
+          router.push('/dashboard')
+        }
       } catch (error: any) {
         ElMessage.error(error.message || '登录失败，请检查用户名和密码')
       }
@@ -130,7 +142,9 @@ const handleLogin = () => {
 
 // 跳转到注册页
 const toRegister = () => {
+  console.log('点击了注册按钮，准备跳转到注册页面')
   router.push('/register')
+  console.log('路由跳转已执行')
 }
 </script>
 

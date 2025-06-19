@@ -48,7 +48,10 @@
       <el-dropdown trigger="click">
         <div class="user-avatar">
           <el-avatar :size="32" :src="userAvatar"></el-avatar>
-          <span class="username">{{ username }}</span>
+          <div class="user-text">
+            <span class="username">{{ username }}</span>
+            <span class="user-role">{{ userRole }}</span>
+          </div>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -82,6 +85,18 @@ const authStore = useAuthStore()
 const username = computed(() => {
   return authStore.user?.full_name || authStore.user?.username || '用户'
 })
+
+const userRole = computed(() => {
+  const role = authStore.user?.role
+  const roleMap: Record<string, string> = {
+    'admin': '系统管理员',
+    'hr': 'HR管理员',
+    'manager': '部门经理',
+    'employee': '普通员工'
+  }
+  return roleMap[role] || '未知角色'
+})
+
 const userAvatar = ref(defaultAvatar)
 
 // 路由
@@ -228,9 +243,21 @@ const handleLogout = () => {
       align-items: center;
       cursor: pointer;
       
-      .username {
+      .user-text {
         margin-left: 8px;
-        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+        
+        .username {
+          font-size: 14px;
+          line-height: 1.2;
+        }
+        
+        .user-role {
+          font-size: 12px;
+          opacity: 0.8;
+          line-height: 1.2;
+        }
       }
     }
   }

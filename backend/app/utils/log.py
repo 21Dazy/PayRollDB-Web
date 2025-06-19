@@ -1,8 +1,7 @@
 from typing import Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
-
-from app.models.operation_log import OperationLog
+from sqlalchemy import text
 
 def log_operation(
     db: Session,
@@ -12,7 +11,7 @@ def log_operation(
     ip_address: Optional[str] = None,
     operation_detail: str = None,
     user_agent: Optional[str] = None,
-) -> OperationLog:
+) -> None:
     """
     记录操作日志
     
@@ -24,23 +23,32 @@ def log_operation(
         ip_address: IP地址
         operation_detail: 操作详情（已弃用，请使用operation_content）
         user_agent: 用户代理（已弃用）
-        
-    Returns:
-        创建的日志记录
     """
     if operation_content is None and operation_detail is not None:
         operation_content = operation_detail
     
-    log = OperationLog(
-        user_id=user_id,
-        operation_type=operation_type,
-        operation_content=operation_content,
-        ip_address=ip_address,
-        operation_time=datetime.now(),
-    )
+    # 使用原生SQL插入日志，避免模型类导入问题
+    sql = """
+    INSERT INTO operation_logs 
+    (user_id, operation_type, operation_content, ip_address, operation_time, created_at)
+    VALUES (:user_id, :operation_type, :operation_content, :ip_address, :operation_time, :created_at)
+    """
     
-    db.add(log)
-    db.commit()
-    db.refresh(log)
-    
-    return log 
+    try:
+        now = datetime.now()
+        db.execute(
+            text(sql),
+            {
+                "user_id": user_id,
+                "operation_type": operation_type,
+                "operation_content": operation_content,
+                "ip_address": ip_address,
+                "operation_time": now,
+                "created_at": now
+            }
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"记录操作日志失败: {str(e)}")
+        # 不抛出异常，避免影响主流程 

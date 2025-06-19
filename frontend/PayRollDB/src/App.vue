@@ -38,7 +38,8 @@ onMounted(async () => {
     } catch (error) {
       console.error('获取用户信息失败:', error)
       // 如果获取用户信息失败，可能是token已过期
-      if (router.currentRoute.value.path !== '/login') {
+      const currentPath = router.currentRoute.value.path
+      if (currentPath !== '/login' && currentPath !== '/register') {
         // 尝试自动重新登录
         const success = await authStore.autoRelogin()
         if (!success) {
@@ -55,8 +56,8 @@ onMounted(async () => {
 
 // 监听路由变化，检查认证状态
 watch(() => router.currentRoute.value.path, (path) => {
-  // 如果路径不是登录页，并且没有token，跳转到登录页
-  if (path !== '/login' && !authStore.token) {
+  // 如果路径不是登录页或注册页，并且没有token，跳转到登录页
+  if (path !== '/login' && path !== '/register' && !authStore.token) {
     router.push('/login')
   }
 })

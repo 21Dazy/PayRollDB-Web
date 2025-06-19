@@ -20,4 +20,5 @@ class User(Base):
     last_login = Column(DateTime, comment='上次登录时间')
     
     # 关系
-    employee = relationship("Employee", foreign_keys=[employee_id], back_populates="user") 
+    employee = relationship("Employee", foreign_keys=[employee_id], back_populates="user")
+    permissions = relationship("UserPermission", foreign_keys="UserPermission.user_id", back_populates="user") 
