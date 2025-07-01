@@ -31,9 +31,181 @@
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="card-header">
-                <span>{{ isAdmin ? '薪资发放统计' : '我的薪资趋势' }}</span>
+                <span>{{ isAdmin ? '薪资统计报表' : '我的薪资趋势' }}</span>
+                <!-- 管理员显示筛选条件 -->
+                <div v-if="isAdmin" class="filter-controls">
+                  <el-select 
+                    v-model="salaryFilter.departmentId" 
+                    placeholder="选择部门" 
+                    clearable 
+                    size="small"
+                    style="width: 120px; margin-right: 10px;"
+                    @change="onFilterChange"
+                  >
+                    <el-option
+                      v-for="dept in departmentOptions"
+                      :key="dept.value"
+                      :label="dept.label"
+                      :value="dept.value"
+                    />
+                  </el-select>
+                  <el-select 
+                    v-model="salaryFilter.positionId" 
+                    placeholder="选择职位" 
+                    clearable 
+                    size="small"
+                    style="width: 120px; margin-right: 10px;"
+                    @change="onFilterChange"
+                  >
+                    <el-option
+                      v-for="pos in positionOptions"
+                      :key="pos.value"
+                      :label="pos.label"
+                      :value="pos.value"
+                    />
+                  </el-select>
+                  <el-date-picker
+                    v-model="salaryFilter.yearMonth"
+                    type="month"
+                    placeholder="选择月份"
+                    size="small"
+                    style="width: 120px;"
+                    format="YYYY年MM月"
+                    value-format="YYYY-MM"
+                    @change="onFilterChange"
+                  />
+                </div>
               </div>
             </template>
+            
+            <!-- 管理员显示薪资统计表格和图表 -->
+            <div v-if="isAdmin">
+              <!-- 薪资统计卡片 -->
+              <el-row :gutter="16" class="salary-stats-cards" style="margin-bottom: 20px;">
+                <el-col :span="6">
+                  <el-card shadow="hover" class="stat-mini-card">
+                    <div class="stat-item">
+                      <div class="stat-value">{{ salaryStats.employeeCount || 0 }}</div>
+                      <div class="stat-label">员工数量</div>
+                    </div>
+                  </el-card>
+                </el-col>
+                <el-col :span="6">
+                  <el-card shadow="hover" class="stat-mini-card">
+                    <div class="stat-item">
+                      <div class="stat-value">¥{{ formatNumber(salaryStats.averageSalary || 0) }}</div>
+                      <div class="stat-label">平均薪资</div>
+                    </div>
+                  </el-card>
+                </el-col>
+                <el-col :span="6">
+                  <el-card shadow="hover" class="stat-mini-card">
+                    <div class="stat-item">
+                      <div class="stat-value">¥{{ formatNumber(salaryStats.maxSalary || 0) }}</div>
+                      <div class="stat-label">最高薪资</div>
+                    </div>
+                  </el-card>
+                </el-col>
+                <el-col :span="6">
+                  <el-card shadow="hover" class="stat-mini-card">
+                    <div class="stat-item">
+                      <div class="stat-value">¥{{ formatNumber(salaryStats.minSalary || 0) }}</div>
+                      <div class="stat-label">最低薪资</div>
+                    </div>
+                  </el-card>
+                </el-col>
+              </el-row>
+              
+              <!-- 薪资详细数据表格 -->
+              <el-table 
+                :data="salaryTableData" 
+                style="width: 100%; margin-bottom: 20px;"
+                max-height="300"
+                v-loading="salaryStatsLoading"
+              >
+                <el-table-column prop="employee_name" label="员工姓名" width="120" />
+                <el-table-column prop="department_name" label="部门" width="120" />
+                <el-table-column prop="position_name" label="职位" width="120" />
+                <el-table-column prop="base_salary" label="基本工资" width="100">
+                  <template #default="{ row }">
+                    ¥{{ formatNumber(row.base_salary || 0) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="net_salary" label="实发工资" width="100">
+                  <template #default="{ row }">
+                    ¥{{ formatNumber(row.net_salary || 0) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="status" label="状态" width="80">
+                  <template #default="{ row }">
+                    <el-tag :type="row.status === 'paid' ? 'success' : 'warning'">
+                      {{ row.status === 'paid' ? '已发放' : '待发放' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+            
+            <!-- 普通员工显示简化的薪资统计 -->
+            <div v-else>
+              <!-- 个人薪资统计卡片 -->
+              <el-row :gutter="16" class="salary-stats-cards" style="margin-bottom: 20px;">
+                <el-col :span="12">
+                  <el-card shadow="hover" class="stat-mini-card">
+                    <div class="stat-item">
+                      <div class="stat-value">¥{{ formatNumber(salaryStats.averageSalary || 0) }}</div>
+                      <div class="stat-label">本月薪资</div>
+                    </div>
+                  </el-card>
+                </el-col>
+                <el-col :span="12">
+                  <el-card shadow="hover" class="stat-mini-card">
+                    <div class="stat-item">
+                      <div class="stat-value">{{ salaryTableData.length > 0 ? '已发放' : '未发放' }}</div>
+                      <div class="stat-label">发放状态</div>
+                    </div>
+                  </el-card>
+                </el-col>
+              </el-row>
+              
+              <!-- 个人薪资详情 -->
+              <div v-if="salaryTableData.length > 0" class="personal-salary-detail">
+                <el-descriptions :column="2" border>
+                  <el-descriptions-item label="基本工资">
+                    ¥{{ formatNumber(salaryTableData[0]?.base_salary || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="加班费">
+                    ¥{{ formatNumber(salaryTableData[0]?.overtime_pay || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="绩效奖金">
+                    ¥{{ formatNumber(salaryTableData[0]?.performance_bonus || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="全勤奖">
+                    ¥{{ formatNumber(salaryTableData[0]?.attendance_bonus || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="交通补贴">
+                    ¥{{ formatNumber(salaryTableData[0]?.transportation_allowance || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="餐补">
+                    ¥{{ formatNumber(salaryTableData[0]?.meal_allowance || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="社保扣款">
+                    ¥{{ formatNumber(salaryTableData[0]?.social_security || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="个税">
+                    ¥{{ formatNumber(salaryTableData[0]?.personal_tax || 0) }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="实发工资" span="2">
+                    <el-tag type="success" size="large">
+                      ¥{{ formatNumber(salaryTableData[0]?.net_salary || 0) }}
+                    </el-tag>
+                  </el-descriptions-item>
+                </el-descriptions>
+              </div>
+              <el-empty v-else description="暂无薪资数据" :image-size="100" />
+            </div>
+            
+            <!-- 图表容器 -->
             <div class="chart" id="salaryChart"></div>
           </el-card>
         </el-col>
@@ -42,7 +214,7 @@
           <el-card class="chart-card" shadow="hover">
             <template #header>
               <div class="card-header">
-                <span>{{ isAdmin ? '部门人员分布' : '我的考勤统计' }}</span>
+                <span>{{ isAdmin ? '部门薪资分布' : '我的考勤统计' }}</span>
               </div>
             </template>
             <div class="chart" id="deptChart"></div>
@@ -108,6 +280,7 @@ import { useSystemStore } from '@/stores/system'
 import { useAuthStore } from '@/stores/auth'
 import { getUserDashboardStats, getUserActivityLogs } from '@/api/user'
 import { ElLoading, ElMessage } from 'element-plus'
+import { get } from '@/utils/request'
 
 // 系统数据
 const systemStore = useSystemStore()
@@ -116,6 +289,29 @@ const systemOverview = ref<any>(null)
 const userStats = ref<any>(null)
 const isDataLoaded = ref(false)
 const activityList = ref<any[]>([])
+
+// 薪资统计相关数据
+const salaryFilter = ref({
+  departmentId: null as number | null,
+  positionId: null as number | null,
+  yearMonth: null as string | null
+})
+
+const salaryStats = ref({
+  employeeCount: 0,
+  averageSalary: 0,
+  maxSalary: 0,
+  minSalary: 0
+})
+
+const salaryTableData = ref<any[]>([])
+const salaryStatsLoading = ref(false)
+
+// 部门选项
+const departmentOptions = ref<Array<{label: string, value: number}>>([])
+
+// 职位选项
+const positionOptions = ref<Array<{label: string, value: number}>>([])
 
 // 判断是否为管理员
 const isAdmin = computed(() => {
@@ -285,6 +481,83 @@ const fetchUserActivity = async () => {
   }
 }
 
+// 加载部门和职位选项
+const loadDepartmentAndPositionOptions = async () => {
+  try {
+    // 加载部门选项
+    const departments = await get('/api/v1/departments/')
+    departmentOptions.value = departments.map((dept: any) => ({
+      label: dept.name,
+      value: dept.id
+    }))
+
+    // 加载职位选项
+    const positions = await get('/api/v1/positions/')
+    positionOptions.value = positions.map((pos: any) => ({
+      label: pos.name,
+      value: pos.id
+    }))
+  } catch (error) {
+    console.error('加载选项数据失败:', error)
+  }
+}
+
+// 获取薪资统计数据
+const fetchSalaryStats = async () => {
+  salaryStatsLoading.value = true
+  try {
+    const params: any = {}
+    
+    if (salaryFilter.value.departmentId) {
+      params.department_id = salaryFilter.value.departmentId
+    }
+    if (salaryFilter.value.positionId) {
+      params.position_id = salaryFilter.value.positionId
+    }
+    if (salaryFilter.value.yearMonth) {
+      const [year, month] = salaryFilter.value.yearMonth.split('-')
+      params.year = parseInt(year)
+      params.month = parseInt(month)
+    } else {
+      // 默认当前月份
+      const now = new Date()
+      params.year = now.getFullYear()
+      params.month = now.getMonth() + 1
+    }
+
+    const data = await get('/api/v1/salaries/statistics', params)
+    
+    // 更新统计数据
+    salaryStats.value = {
+      employeeCount: data.employee_count || 0,
+      averageSalary: data.average_salary || 0,
+      maxSalary: data.max_salary || 0,
+      minSalary: data.min_salary || 0
+    }
+    
+    // 更新表格数据
+    salaryTableData.value = data.salary_records || []
+    
+    // 更新图表数据（如果需要）
+    if (data.department_salary_distribution) {
+      systemOverview.value = {
+        ...systemOverview.value,
+        department_salary_data: data.department_salary_distribution
+      }
+    }
+  } catch (error) {
+    console.error('获取薪资统计数据失败:', error)
+    ElMessage.error('获取薪资统计数据失败')
+  } finally {
+    salaryStatsLoading.value = false
+  }
+}
+
+// 筛选条件变化处理
+const onFilterChange = () => {
+  fetchSalaryStats()
+}
+
 // 获取数据的统一方法
 const fetchData = async () => {
   const loading = ElLoading.service({
@@ -295,11 +568,16 @@ const fetchData = async () => {
   
   try {
     if (isAdmin.value) {
-      await fetchSystemOverview()
+      await Promise.all([
+        fetchSystemOverview(),
+        loadDepartmentAndPositionOptions(),
+        fetchSalaryStats()
+      ])
     } else {
       await Promise.all([
         fetchUserStats(),
-        fetchUserActivity()
+        fetchUserActivity(),
+        fetchSalaryStats()  // 普通员工也可以获取自己的薪资统计
       ])
     }
     isDataLoaded.value = true
@@ -425,39 +703,42 @@ const initDeptChart = (echarts: any) => {
   
   let option
   if (isAdmin.value) {
-    // 管理员显示部门人员分布
-    const deptData = systemOverview.value?.department_data || [
-      { name: '研发部', value: 40 },
-      { name: '市场部', value: 25 },
-      { name: '销售部', value: 30 },
-      { name: '行政部', value: 15 },
-      { name: '财务部', value: 10 },
-      { name: '人力资源部', value: 6 }
+    // 管理员显示部门薪资分布
+    const deptSalaryData = systemOverview.value?.department_salary_data || [
+      { name: '研发部', value: 250000 },
+      { name: '市场部', value: 180000 },
+      { name: '销售部', value: 220000 },
+      { name: '行政部', value: 120000 },
+      { name: '财务部', value: 150000 },
+      { name: '人力资源部', value: 100000 }
     ]
     
     option = {
       tooltip: {
         trigger: 'item',
-        formatter: '{a} <br/>{b}: {c} ({d}%)'
+        formatter: '{a} <br/>{b}: ¥{c} ({d}%)'
       },
       legend: {
         orient: 'horizontal',
         bottom: 'bottom',
-        data: deptData.map((item: any) => item.name)
+        data: deptSalaryData.map((item: any) => item.name)
       },
       series: [
         {
-          name: '部门分布',
+          name: '部门薪资',
           type: 'pie',
           radius: '50%',
           center: ['50%', '45%'],
-          data: deptData,
+          data: deptSalaryData,
           emphasis: {
             itemStyle: {
               shadowBlur: 10,
               shadowOffsetX: 0,
               shadowColor: 'rgba(0, 0, 0, 0.5)'
             }
+          },
+          label: {
+            formatter: '{b}\n¥{c}'
           }
         }
       ]
@@ -596,10 +877,40 @@ onMounted(() => {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        
+        .filter-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
       }
       
       .chart {
         height: 350px;
+      }
+      
+      .salary-stats-cards {
+        .stat-mini-card {
+          text-align: center;
+          
+          .stat-item {
+            .stat-value {
+              font-size: 20px;
+              font-weight: bold;
+              color: #409EFF;
+              margin-bottom: 5px;
+            }
+            
+            .stat-label {
+              font-size: 12px;
+              color: #909399;
+            }
+          }
+        }
+      }
+      
+      .personal-salary-detail {
+        margin-bottom: 20px;
       }
     }
   }

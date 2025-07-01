@@ -394,13 +394,13 @@ const handleVerifyEmployee = () => {
         console.log('保存的员工信息:', employeeInfo.value)
         
         // 强制进入下一步
-        currentStep.value = 1
+          currentStep.value = 1
         console.log('当前步骤已更新为:', currentStep.value)
         
         // 强制刷新视图
         forceUpdate()
         
-        ElMessage.success('员工信息验证成功')
+          ElMessage.success('员工信息验证成功')
       } catch (error: any) {
         console.error('验证员工信息错误:', error)
         ElMessage.error(error.response?.data?.detail || '员工信息验证失败')
@@ -456,13 +456,13 @@ const handleVerifyCode = () => {
         // })
         
         // 直接进入下一步
-        currentStep.value = 2
+      currentStep.value = 2
         console.log('当前步骤已更新为:', currentStep.value)
         
         // 强制刷新视图
         forceUpdate()
         
-        ElMessage.success('验证码验证成功')
+      ElMessage.success('验证码验证成功')
       } catch (error: any) {
         console.error('验证码验证错误:', error)
         ElMessage.error(error.response?.data?.detail || '验证码验证失败')

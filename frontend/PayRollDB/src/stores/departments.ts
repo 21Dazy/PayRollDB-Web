@@ -88,8 +88,11 @@ export const useDepartmentsStore = defineStore('departments', () => {
     error.value = null;
     try {
       const response = await post('/api/v1/departments/', departmentData);
-      // 重新获取部门列表以更新状态
-      await getDepartments();
+      // 重新获取部门列表以更新状态（包括带员工数量的列表）
+      await Promise.all([
+        getDepartments(),
+        getDepartmentsWithEmployeeCount()
+      ]);
       return response;
     } catch (err: any) {
       error.value = err.message || '创建部门失败';
@@ -109,6 +112,11 @@ export const useDepartmentsStore = defineStore('departments', () => {
       const index = departments.value.findIndex(dept => dept.id === id);
       if (index !== -1) {
         departments.value[index] = { ...departments.value[index], ...response };
+      }
+      // 更新带员工数量的列表
+      const indexWithCount = departmentsWithCount.value.findIndex(dept => dept.id === id);
+      if (indexWithCount !== -1) {
+        departmentsWithCount.value[indexWithCount] = { ...departmentsWithCount.value[indexWithCount], ...response };
       }
       if (currentDepartment.value && currentDepartment.value.id === id) {
         currentDepartment.value = { ...currentDepartment.value, ...response };
@@ -130,6 +138,7 @@ export const useDepartmentsStore = defineStore('departments', () => {
       await del(`/api/v1/departments/${id}`);
       // 从本地列表中移除
       departments.value = departments.value.filter(dept => dept.id !== id);
+      departmentsWithCount.value = departmentsWithCount.value.filter(dept => dept.id !== id);
       if (currentDepartment.value && currentDepartment.value.id === id) {
         currentDepartment.value = null;
       }

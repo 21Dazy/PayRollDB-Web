@@ -8,6 +8,7 @@ from app.api.deps import get_current_hr_user, get_current_user, get_db
 from app.models.user import User
 from app.models.department import Department
 from app.models.employee import Employee
+from app.models.position import Position
 from app.schemas.department import (
     DepartmentCreate, DepartmentUpdate, DepartmentResponse,
     DepartmentWithEmployeeCount
@@ -171,10 +172,14 @@ def delete_department(
     *,
     db: Session = Depends(get_db),
     department_id: int,
+    force: bool = False,
     current_user: User = Depends(get_current_hr_user)
 ) -> None:
     """
     删除部门
+    
+    Args:
+        force: 是否强制删除，为True时会先删除部门下的所有职位
     """
     # 检查部门是否存在
     department = db.query(Department).filter(Department.id == department_id).first()
@@ -189,8 +194,32 @@ def delete_department(
     if employee_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="部门下有员工，无法删除"
+            detail="部门下有员工，无法删除。请先转移或删除部门下的所有员工。"
         )
+    
+    # 检查部门下是否有职位
+    positions = db.query(Position).filter(Position.department_id == department_id).all()
+    if positions:
+        if not force:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"部门下有 {len(positions)} 个职位，无法删除。请先删除部门下的所有职位，或使用 force=true 参数强制删除。"
+            )
+        else:
+            # 强制删除模式：先检查职位下是否有员工
+            for position in positions:
+                position_employee_count = db.query(Employee).filter(Employee.position_id == position.id).count()
+                if position_employee_count > 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"职位 '{position.name}' 下有员工，无法删除。请先转移职位下的所有员工。"
+                    )
+            
+            # 删除所有职位
+            for position in positions:
+                db.delete(position)
+            
+            print(f"强制删除模式：已删除部门 '{department.name}' 下的 {len(positions)} 个职位")
     
     # 检查当前用户ID是否存在
     user = db.query(User).filter(User.id == current_user.id).first()
@@ -210,11 +239,12 @@ def delete_department(
     
     try:
         # 记录操作日志
+        force_msg = "（强制删除）" if force else ""
         log_operation(
             db=db,
             user_id=current_user.id,
             operation_type="删除部门",
-            operation_detail=f"删除了部门: {department_name}, ID: {department_id_value}"
+            operation_content=f"删除了部门: {department_name}, ID: {department_id_value} {force_msg}"
         )
     except Exception as e:
         # 如果记录日志失败，记录错误但不影响部门删除

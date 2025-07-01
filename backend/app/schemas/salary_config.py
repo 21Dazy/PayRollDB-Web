@@ -58,4 +58,9 @@ class SalaryGenerateResponse(BaseModel):
     message: str
     generated_count: int
     failed_count: int = 0
-    errors: Optional[List[str]] = None 
+    errors: Optional[List[str]] = None
+    total_generated: Optional[int] = None
+    total_updated: Optional[int] = None
+    department_id: Optional[int] = None
+    year: Optional[int] = None
+    month: Optional[int] = None 

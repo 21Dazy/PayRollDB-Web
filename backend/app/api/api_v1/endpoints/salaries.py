@@ -765,7 +765,167 @@ def generate_salary_records(
             message=f"成功生成{result['generated_count']}条薪资记录",
             generated_count=result['generated_count'],
             failed_count=result.get('failed_count', 0),
-            errors=result.get('errors', [])
+            errors=result.get('errors', []),
+            total_generated=result['generated_count'],
+            total_updated=result['updated_count'],
+            department_id=request.department_id,
+            year=request.year,
+            month=request.month
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) 
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/statistics")
+def get_salary_statistics(
+    year: Optional[int] = Query(None, description="年份"),
+    month: Optional[int] = Query(None, description="月份"),
+    department_id: Optional[int] = Query(None, description="部门ID"),
+    position_id: Optional[int] = Query(None, description="职位ID"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # 改为普通用户权限
+) -> Any:
+    """
+    获取薪资统计数据，支持按部门、职位筛选
+    管理员可以查看全局统计，普通员工只能查看自己的数据
+    """
+    from app.models.department import Department
+    from app.models.position import Position
+    from sqlalchemy import func, desc
+    
+    # 如果没有指定年月，默认使用当前年月
+    if not year:
+        year = datetime.now().year
+    if not month:
+        month = datetime.now().month
+    
+    # 构建基础查询
+    query = db.query(SalaryRecord).join(Employee).filter(
+        SalaryRecord.year == year,
+        SalaryRecord.month == month,
+        Employee.status == 1  # 只查询在职员工
+    )
+    
+    # 权限控制：普通员工只能查看自己的数据
+    if current_user.role not in ["admin", "hr", "manager"]:
+        if not current_user.employee_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="普通用户需要关联员工信息才能查看薪资统计"
+            )
+        query = query.filter(Employee.id == current_user.employee_id)
+        # 普通员工不能使用部门和职位筛选
+        department_id = None
+        position_id = None
+    else:
+        # 管理员可以按部门和职位筛选
+        if department_id:
+            query = query.filter(Employee.department_id == department_id)
+        
+        if position_id:
+            query = query.filter(Employee.position_id == position_id)
+    
+    # 获取薪资记录
+    salary_records = query.all()
+    
+    if not salary_records:
+        return {
+            "year": year,
+            "month": month,
+            "employee_count": 0,
+            "average_salary": 0,
+            "max_salary": 0,
+            "min_salary": 0,
+            "total_salary": 0,
+            "salary_records": [],
+            "department_salary_distribution": []
+        }
+    
+    # 计算统计数据
+    net_salaries = [float(record.net_salary) for record in salary_records]
+    employee_count = len(salary_records)
+    average_salary = sum(net_salaries) / employee_count if employee_count > 0 else 0
+    max_salary = max(net_salaries) if net_salaries else 0
+    min_salary = min(net_salaries) if net_salaries else 0
+    total_salary = sum(net_salaries)
+    
+    # 构建薪资记录详情
+    salary_records_data = []
+    for record in salary_records:
+        salary_records_data.append({
+            "id": record.id,
+            "employee_id": record.employee_id,
+            "employee_name": record.employee.name,
+            "department_name": record.employee.department.name if record.employee.department else "",
+            "position_name": record.employee.position.name if record.employee.position else "",
+            "base_salary": float(record.base_salary),
+            "overtime_pay": float(record.overtime_pay),
+            "bonus": float(record.bonus),
+            "performance_bonus": float(record.performance_bonus),
+            "attendance_bonus": float(record.attendance_bonus),
+            "transportation_allowance": float(record.transportation_allowance),
+            "meal_allowance": float(record.meal_allowance),
+            "total_income": float(
+                record.base_salary + record.overtime_pay + record.bonus + 
+                record.performance_bonus + record.attendance_bonus + 
+                record.transportation_allowance + record.meal_allowance
+            ),
+            "deduction": float(record.deduction),
+            "social_security": float(record.social_security),
+            "late_deduction": float(record.late_deduction),
+            "absence_deduction": float(record.absence_deduction),
+            "personal_tax": float(record.personal_tax),
+            "total_deduction": float(
+                record.deduction + record.social_security + record.late_deduction + 
+                record.absence_deduction + record.personal_tax
+            ),
+            "net_salary": float(record.net_salary),
+            "status": record.status,
+            "payment_date": record.payment_date
+        })
+    
+    # 计算部门薪资分布（只有管理员且没有按部门筛选时才显示）
+    department_salary_distribution = []
+    if current_user.role in ["admin", "hr", "manager"] and not department_id:
+        dept_query = (
+            db.query(
+                Department.name.label('department_name'),
+                func.sum(SalaryRecord.net_salary).label('total_salary'),
+                func.count(SalaryRecord.id).label('employee_count'),
+                func.avg(SalaryRecord.net_salary).label('average_salary')
+            )
+            .join(Employee, Employee.department_id == Department.id)
+            .join(SalaryRecord, SalaryRecord.employee_id == Employee.id)
+            .filter(
+                SalaryRecord.year == year,
+                SalaryRecord.month == month,
+                Employee.status == 1
+            )
+            .group_by(Department.id, Department.name)
+            .all()
+        )
+        
+        for dept_data in dept_query:
+            department_salary_distribution.append({
+                "name": dept_data.department_name,
+                "value": float(dept_data.total_salary),
+                "employee_count": dept_data.employee_count,
+                "average_salary": float(dept_data.average_salary)
+            })
+    
+    return {
+        "year": year,
+        "month": month,
+        "filter": {
+            "department_id": department_id,
+            "position_id": position_id
+        },
+        "employee_count": employee_count,
+        "average_salary": round(average_salary, 2),
+        "max_salary": max_salary,
+        "min_salary": min_salary,
+        "total_salary": total_salary,
+        "salary_records": salary_records_data,
+        "department_salary_distribution": department_salary_distribution,
+        "user_role": current_user.role,  # 返回用户角色，前端可据此调整显示
+        "is_personal_view": current_user.role not in ["admin", "hr", "manager"]  # 是否为个人视图
+    } 

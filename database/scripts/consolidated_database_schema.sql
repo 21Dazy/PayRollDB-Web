@@ -242,8 +242,10 @@ INSERT INTO system_parameters (param_key, param_value, description) VALUES
 ('weekend_overtime_rate', '2', '加班费率(周末)'),
 ('holiday_overtime_rate', '3', '加班费率(节假日)'),
 ('tax_threshold', '5000', '个税起征点'),
-('salary_day', '10', '每月发薪日'); 
-
+('salary_day', '10', '每月发薪日')
+ON DUPLICATE KEY UPDATE
+param_value = VALUES(param_value),
+description = VALUES(description);
 
 -- =================================================================================================
 -- 来自: update_salary_components.sql
@@ -521,7 +523,10 @@ INSERT INTO system_parameters (param_key, param_value, description) VALUES
 ('registration_approval_required', '1', '用户注册是否需要管理员审核'),
 ('employee_info_change_approval', '1', '员工信息变更是否需要审核'),
 ('max_login_attempts', '5', '最大登录尝试次数'),
-('session_timeout_minutes', '120', '会话超时时间(分钟)');
+('session_timeout_minutes', '120', '会话超时时间(分钟)')
+ON DUPLICATE KEY UPDATE
+param_value = VALUES(param_value),
+description = VALUES(description);
 
 -- 创建视图：用户可访问的薪资记录
 CREATE OR REPLACE VIEW user_salary_view AS

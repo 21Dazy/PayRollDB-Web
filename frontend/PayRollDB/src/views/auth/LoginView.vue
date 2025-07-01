@@ -52,7 +52,7 @@
           {{ authStore.isLoading ? '登录中...' : '登 录' }}
         </el-button>
         
-        <div class="register-link" v-if="activeTab === 'admin'">
+        <div class="register-link" >
           <span>还没有账号？</span>
           <el-link type="primary" @click="toRegister">立即注册</el-link>
         </div>

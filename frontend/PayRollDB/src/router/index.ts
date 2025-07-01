@@ -194,7 +194,7 @@ const routes: RouteRecordRaw[] = [
         ]
       },
       // 报表统计路由 - 管理员权限
-      {
+          {
         path: 'report',
         name: 'report',
         redirect: '/report/salary',
@@ -344,7 +344,7 @@ router.beforeEach((to, from, next) => {
         // 根据用户角色重定向到合适的页面
         if (userRole === 'employee') {
           next({ name: 'user-profile' }) // 普通用户重定向到个人中心
-        } else {
+    } else {
           next({ name: 'dashboard' }) // 其他角色重定向到首页
         }
         return
@@ -353,7 +353,7 @@ router.beforeEach((to, from, next) => {
 
     // 权限检查通过，允许访问
     console.log(`用户角色 ${userRole} 有权限访问 ${to.path}`)
-    next()
+      next()
   } else {
     // 不需要登录，直接放行
     console.log('不需要登录权限，直接放行')

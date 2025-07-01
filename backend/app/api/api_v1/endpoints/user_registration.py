@@ -281,7 +281,7 @@ def register_user_direct(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"注册失败: {str(e)}"
-        )
+    )
 
 @router.get("/registrations", response_model=List[RegistrationListResponse])
 def get_registration_list(

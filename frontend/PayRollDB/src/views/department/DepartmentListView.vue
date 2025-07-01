@@ -58,13 +58,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, onActivated, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import { useDepartmentsStore } from '@/stores/departments'
 
 const router = useRouter()
+const route = useRoute()
 
 // 引入store
 const departmentsStore = useDepartmentsStore()
@@ -177,8 +178,23 @@ const handleDelete = (row: any) => {
   })
 }
 
+// 监听路由变化，当从其他页面返回时自动刷新数据
+watch(
+  () => route.path,
+  (newPath) => {
+    if (newPath === '/department/list') {
+      fetchData()
+    }
+  }
+)
+
 // 初始化
 onMounted(() => {
+  fetchData()
+})
+
+// 当组件被激活时（如从 keep-alive 中恢复）自动刷新数据
+onActivated(() => {
   fetchData()
 })
 </script>

@@ -49,7 +49,7 @@
         <div class="user-avatar">
           <el-avatar :size="32" :src="userAvatar"></el-avatar>
           <div class="user-text">
-            <span class="username">{{ username }}</span>
+          <span class="username">{{ username }}</span>
             <span class="user-role">{{ userRole }}</span>
           </div>
         </div>
@@ -249,7 +249,7 @@ const handleLogout = () => {
         flex-direction: column;
         
         .username {
-          font-size: 14px;
+        font-size: 14px;
           line-height: 1.2;
         }
         
